@@ -1,0 +1,88 @@
+openapi: 3.0.3
+info:
+  title: Demo Store API
+  version: 1.0.0
+  description: Synthetic API fixture used by ContractGuard demonstrations.
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of products to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Product list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  total:
+                    type: integer
+                    minimum: 0
+  /products/{productId}:
+    get:
+      operationId: getProduct
+      summary: Get a product by identifier
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Product:
+      type: object
+      required: [id, name, description, price, currency, stock]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          enum: [INR, USD]
+        stock:
+          type: integer
+          minimum: 0
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

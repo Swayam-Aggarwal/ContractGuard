@@ -1,0 +1,82 @@
+
+{
+  "product": "ContractGuard",
+  "manifestVersion": "1.0.0",
+  "blueprintVersion": "1.1.0",
+  "status": "Planning and specification review",
+  "lastUpdated": "2026-11-07",
+  "totalFiles": 17,
+  "directories": [
+    "docs",
+    "examples"
+  ],
+  "rootFiles": [
+    {
+      "path": "README.md",
+      "type": "documentation",
+      "purpose": "Project overview, scope, technology baseline, and documentation index"
+    },
+    {
+      "path": ".env.example",
+      "type": "configuration-template",
+      "purpose": "Environment variable template with safe placeholders"
+    },
+    {
+      "path": ".gitignore",
+      "type": "configuration",
+      "purpose": "Git exclusion rules"
+    },
+    {
+      "path": "MANIFEST.json",
+      "type": "manifest",
+      "purpose": "Documentation package inventory and version metadata"
+    }
+  ],
+  "documentation": [
+    "docs/PRD.md",
+    "docs/Design.md",
+    "docs/TRD.md",
+    "docs/Architecture.md",
+    "docs/AppFlow.md",
+    "docs/Schema.md",
+    "docs/API.md",
+    "docs/Rules.md",
+    "docs/SecurityReview.md",
+    "docs/ImplementationPlan.md"
+  ],
+  "examples": [
+    {
+      "path": "examples/README.md",
+      "purpose": "Demo Store fixture documentation and expected compatibility changes"
+    },
+    {
+      "path": "examples/demo-store-v1.yaml",
+      "purpose": "Baseline Demo Store OpenAPI specification",
+      "openapiVersion": "3.0.3",
+      "apiVersion": "1.0.0"
+    },
+    {
+      "path": "examples/demo-store-v2.yaml",
+      "purpose": "Candidate Demo Store OpenAPI specification",
+      "openapiVersion": "3.0.3",
+      "apiVersion": "2.0.0"
+    }
+  ],
+  "technologyBaseline": {
+    "language": "JavaScript",
+    "runtime": "Node.js 24.x",
+    "frontend": "React",
+    "buildTool": "Vite",
+    "backend": "Express 5",
+    "database": "MongoDB",
+    "odm": "Mongoose",
+    "compatibilityRuleset": "CG-COMPAT-1.1"
+  },
+  "implementationStatus": {
+    "documentation": "Under review",
+    "applicationSourceCode": "Not started",
+    "compatibilityEngine": "Not implemented",
+    "regressionRunner": "Not implemented",
+    "aiIntegration": "Not implemented"
+  }
+}
