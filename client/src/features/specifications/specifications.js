@@ -1,4 +1,3 @@
-
 import {
   useMutation,
   useQuery,
@@ -45,6 +44,13 @@ export const specificationQueryKeys = {
     specVersionId,
     componentType,
     componentName,
+  ],
+
+  reference: (specVersionId, reference) => [
+    "specifications",
+    "reference",
+    specVersionId,
+    reference,
   ],
 };
 
@@ -102,6 +108,12 @@ export const specificationsApi = {
   }) => {
     return apiRequest(
       `/api/v1/specifications/${encodeURIComponent(specVersionId)}/components/${encodeURIComponent(componentType)}/${encodeURIComponent(componentName)}`
+    );
+  },
+
+  getReference: async ({ specVersionId, reference }) => {
+    return apiRequest(
+      `/api/v1/specifications/${encodeURIComponent(specVersionId)}/references?ref=${encodeURIComponent(reference)}`
     );
   },
 };
@@ -215,5 +227,26 @@ export const useSpecificationComponent = (
       componentType &&
       componentName
     ),
+  });
+};
+
+export const useSpecificationReference = (
+  specVersionId,
+  reference,
+  enabled = false
+) => {
+  return useQuery({
+    queryKey: specificationQueryKeys.reference(
+      specVersionId,
+      reference
+    ),
+
+    queryFn: () =>
+      specificationsApi.getReference({
+        specVersionId,
+        reference,
+      }),
+
+    enabled: Boolean(specVersionId && reference && enabled),
   });
 };

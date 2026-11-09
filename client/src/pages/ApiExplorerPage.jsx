@@ -35,6 +35,8 @@ import {
   useSpecificationComponent,
 } from "../features/specifications/specifications.js";
 
+import ReferenceNavigator from "../components/ReferenceNavigator.jsx";
+
 import "./ApiExplorerPage.css";
 
 const EMPTY_ARRAY = Object.freeze([]);
@@ -65,24 +67,18 @@ const METHOD_TONES = {
   QUERY: "query",
 };
 
-const isRecord = (value) => {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value)
-  );
-};
+const isRecord = (value) => (
+  value !== null &&
+  typeof value === "object" &&
+  !Array.isArray(value)
+);
 
 const formatDate = (value) => {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
+  if (Number.isNaN(date.getTime())) return "—";
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -90,42 +86,24 @@ const formatDate = (value) => {
   }).format(date);
 };
 
-const getMethodTone = (method) => {
-  return METHOD_TONES[String(method || "").toUpperCase()] || "custom";
-};
+const getMethodTone = (method) => (
+  METHOD_TONES[String(method || "").toUpperCase()] || "custom"
+);
 
 const getSchemaType = (schema) => {
-  if (!isRecord(schema)) {
-    return "—";
-  }
+  if (!isRecord(schema)) return "—";
 
-  if (typeof schema.type === "string") {
-    return schema.type;
-  }
+  if (typeof schema.type === "string") return schema.type;
 
   if (Array.isArray(schema.type)) {
     return schema.type.join(" | ");
   }
 
-  if (schema.$ref) {
-    return "Reference";
-  }
-
-  if (schema.enum) {
-    return "Enum";
-  }
-
-  if (schema.allOf) {
-    return "All of";
-  }
-
-  if (schema.oneOf) {
-    return "One of";
-  }
-
-  if (schema.anyOf) {
-    return "Any of";
-  }
+  if (schema.$ref) return "Reference";
+  if (schema.enum) return "Enum";
+  if (schema.allOf) return "All of";
+  if (schema.oneOf) return "One of";
+  if (schema.anyOf) return "Any of";
 
   return "Object";
 };
@@ -155,7 +133,10 @@ const CodePreview = ({
       <summary>
         <Code2 size={14} />
         View JSON definition
-        <ChevronDown size={14} className="explorer-code-chevron" />
+        <ChevronDown
+          size={14}
+          className="explorer-code-chevron"
+        />
       </summary>
 
       <pre>{formattedValue}</pre>
@@ -164,7 +145,9 @@ const CodePreview = ({
 };
 
 const MethodBadge = ({ method }) => (
-  <span className={`explorer-method explorer-method-${getMethodTone(method)}`}>
+  <span
+    className={`explorer-method explorer-method-${getMethodTone(method)}`}
+  >
     {method}
   </span>
 );
@@ -173,7 +156,11 @@ const CoverageBadge = ({ status }) => {
   const complete = status === "COMPLETE";
 
   return (
-    <span className={`explorer-coverage ${complete ? "is-complete" : "is-partial"}`}>
+    <span
+      className={`explorer-coverage ${
+        complete ? "is-complete" : "is-partial"
+      }`}
+    >
       {complete ? (
         <ShieldCheck size={14} />
       ) : (
@@ -193,8 +180,12 @@ const SectionHeader = ({
 }) => (
   <div className="explorer-section-header">
     <div>
-      {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+      {eyebrow && (
+        <span className="eyebrow">{eyebrow}</span>
+      )}
+
       <h2>{title}</h2>
+
       {description && <p>{description}</p>}
     </div>
 
@@ -208,7 +199,10 @@ const QueryError = ({ error, onRetry }) => (
 
     <div>
       <strong>Unable to load this information</strong>
-      <p>{error?.message || "The request could not be completed."}</p>
+
+      <p>
+        {error?.message || "The request could not be completed."}
+      </p>
 
       {onRetry && (
         <button
@@ -230,7 +224,9 @@ const OperationListItem = ({
 }) => (
   <button
     type="button"
-    className={`explorer-operation-item ${isActive ? "is-active" : ""}`}
+    className={`explorer-operation-item ${
+      isActive ? "is-active" : ""
+    }`}
     onClick={onClick}
     aria-pressed={isActive}
   >
@@ -255,7 +251,9 @@ const OperationListItem = ({
     </span>
 
     <span className="explorer-operation-summary">
-      {operation.summary || operation.operationId || "No summary provided"}
+      {operation.summary ||
+        operation.operationId ||
+        "No summary provided"}
     </span>
 
     <span className="explorer-operation-meta">
@@ -267,21 +265,17 @@ const OperationListItem = ({
 );
 
 const WarningBanner = ({ specification }) => {
-  if (!specification) {
-    return null;
-  }
+  if (!specification) return null;
 
   const parserWarnings = specification.warnings || EMPTY_ARRAY;
-  const explorerWarnings = specification.explorerWarnings || EMPTY_ARRAY;
+  const explorerWarnings =
+    specification.explorerWarnings || EMPTY_ARRAY;
 
   const isPartial =
     specification.explorerCompleteness === "PARTIAL" ||
     explorerWarnings.length > 0;
 
-  if (
-    !isPartial &&
-    parserWarnings.length === 0
-  ) {
+  if (!isPartial && parserWarnings.length === 0) {
     return null;
   }
 
@@ -309,19 +303,22 @@ const WarningBanner = ({ specification }) => {
           <span>{explorerWarnings.length} explorer warnings</span>
         </div>
 
-        {(parserWarnings.length > 0 || explorerWarnings.length > 0) && (
+        {(parserWarnings.length > 0 ||
+          explorerWarnings.length > 0) && (
           <details className="explorer-warning-details">
             <summary>View diagnostics</summary>
 
-            {[...parserWarnings, ...explorerWarnings].map((warning, index) => (
-              <div
-                className="explorer-warning-item"
-                key={`${warning.field || "warning"}-${index}`}
-              >
-                <code>{warning.field || "document"}</code>
-                <span>{warning.message}</span>
-              </div>
-            ))}
+            {[...parserWarnings, ...explorerWarnings].map(
+              (warning, index) => (
+                <div
+                  className="explorer-warning-item"
+                  key={`${warning.field || "warning"}-${index}`}
+                >
+                  <code>{warning.field || "document"}</code>
+                  <span>{warning.message}</span>
+                </div>
+              )
+            )}
           </details>
         )}
       </div>
@@ -361,10 +358,14 @@ const ParameterSection = ({ parameters }) => {
 
             return (
               <tr
-                key={`${parameter.name || "parameter"}-${parameter.in || "unknown"}-${index}`}
+                key={`${parameter.name || "parameter"}-${
+                  parameter.in || "unknown"
+                }-${index}`}
               >
                 <td>
-                  <strong>{parameter.name || "Unnamed parameter"}</strong>
+                  <strong>
+                    {parameter.name || "Unnamed parameter"}
+                  </strong>
 
                   {parameter.deprecated && (
                     <span className="explorer-inline-muted">
@@ -385,9 +386,13 @@ const ParameterSection = ({ parameters }) => {
 
                 <td>
                   {parameter.required ? (
-                    <span className="explorer-required">Required</span>
+                    <span className="explorer-required">
+                      Required
+                    </span>
                   ) : (
-                    <span className="explorer-optional">Optional</span>
+                    <span className="explorer-optional">
+                      Optional
+                    </span>
                   )}
                 </td>
 
@@ -398,7 +403,9 @@ const ParameterSection = ({ parameters }) => {
 
                   {(parameter.schema || parameter.content) && (
                     <CodePreview
-                      value={parameter.schema || parameter.content}
+                      value={
+                        parameter.schema || parameter.content
+                      }
                     />
                   )}
                 </td>
@@ -411,7 +418,10 @@ const ParameterSection = ({ parameters }) => {
   );
 };
 
-const RequestBodySection = ({ requestBody, reference }) => {
+const RequestBodySection = ({
+  requestBody,
+  reference,
+}) => {
   if (!requestBody) {
     return (
       <div className="explorer-empty-inline">
@@ -429,7 +439,10 @@ const RequestBodySection = ({ requestBody, reference }) => {
       <div className="explorer-body-header">
         <div>
           <strong>Request body</strong>
-          <p>{requestBody.description || "No description provided."}</p>
+
+          <p>
+            {requestBody.description || "No description provided."}
+          </p>
         </div>
 
         {requestBody.required ? (
@@ -460,11 +473,14 @@ const RequestBodySection = ({ requestBody, reference }) => {
             {definition.schema && (
               <div className="explorer-schema-summary">
                 <span>Schema type</span>
-                <strong>{getSchemaType(definition.schema)}</strong>
+                <strong>
+                  {getSchemaType(definition.schema)}
+                </strong>
               </div>
             )}
 
             <CodePreview value={definition.schema} />
+
             <CodePreview
               value={definition.encoding}
               emptyLabel="No encoding information."
@@ -476,8 +492,14 @@ const RequestBodySection = ({ requestBody, reference }) => {
   );
 };
 
-const ResponseSection = ({ responses, references }) => {
-  if (!isRecord(responses) || Object.keys(responses).length === 0) {
+const ResponseSection = ({
+  responses,
+  references,
+}) => {
+  if (
+    !isRecord(responses) ||
+    Object.keys(responses).length === 0
+  ) {
     return (
       <div className="explorer-empty-inline">
         No response definitions are available for this operation.
@@ -487,72 +509,149 @@ const ResponseSection = ({ responses, references }) => {
 
   return (
     <div className="explorer-response-list">
-      {Object.entries(responses).map(([statusCode, response]) => {
-        const content = isRecord(response?.content)
-          ? Object.entries(response.content)
-          : [];
+      {Object.entries(responses).map(
+        ([statusCode, response]) => {
+          const content = isRecord(response?.content)
+            ? Object.entries(response.content)
+            : [];
 
-        const reference = references?.[statusCode];
+          const reference = references?.[statusCode];
 
-        return (
-          <article className="explorer-response-item" key={statusCode}>
-            <div className="explorer-response-heading">
-              <span className="explorer-response-code">
-                {statusCode}
-              </span>
+          return (
+            <article
+              className="explorer-response-item"
+              key={statusCode}
+            >
+              <div className="explorer-response-heading">
+                <span className="explorer-response-code">
+                  {statusCode}
+                </span>
 
-              <div>
-                <strong>
-                  {response?.description || "No response description"}
-                </strong>
+                <div>
+                  <strong>
+                    {response?.description ||
+                      "No response description"}
+                  </strong>
 
-                {reference?.ref && (
-                  <span className="explorer-response-reference">
-                    Ref: {reference.ref}
-                  </span>
-                )}
+                  {reference?.ref && (
+                    <span className="explorer-response-reference">
+                      Ref: {reference.ref}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {content.length > 0 && (
-              <div className="explorer-response-content">
-                {content.map(([mediaType, definition]) => (
-                  <div
-                    className="explorer-media-block"
-                    key={mediaType}
-                  >
-                    <div className="explorer-media-heading">
-                      <FileJson size={14} />
-                      <code>{mediaType}</code>
-                    </div>
+              {content.length > 0 && (
+                <div className="explorer-response-content">
+                  {content.map(
+                    ([mediaType, definition]) => (
+                      <div
+                        className="explorer-media-block"
+                        key={mediaType}
+                      >
+                        <div className="explorer-media-heading">
+                          <FileJson size={14} />
+                          <code>{mediaType}</code>
+                        </div>
 
-                    {definition.schema && (
-                      <div className="explorer-schema-summary">
-                        <span>Schema type</span>
-                        <strong>{getSchemaType(definition.schema)}</strong>
+                        {definition.schema && (
+                          <div className="explorer-schema-summary">
+                            <span>Schema type</span>
+                            <strong>
+                              {getSchemaType(definition.schema)}
+                            </strong>
+                          </div>
+                        )}
+
+                        <CodePreview
+                          value={definition.schema}
+                        />
                       </div>
-                    )}
+                    )
+                  )}
+                </div>
+              )}
 
-                    <CodePreview value={definition.schema} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {content.length === 0 && (
-              <p className="explorer-empty-response">
-                No response content schema declared.
-              </p>
-            )}
-          </article>
-        );
-      })}
+              {content.length === 0 && (
+                <p className="explorer-empty-response">
+                  No response content schema declared.
+                </p>
+              )}
+            </article>
+          );
+        }
+      )}
     </div>
   );
 };
 
+/*
+ * Convert the backend's response-reference metadata into
+ * explicit navigator entries.
+ *
+ * The backend returns:
+ * responseReferences: {
+ *   "200": {
+ *     ref: "#/components/schemas/Product",
+ *     targetPointer: "...",
+ *     chain: [],
+ *     circular: false
+ *   }
+ * }
+ */
+const getResponseReferenceEntries = (
+  responseReferences,
+  sourcePointer
+) => {
+  if (!isRecord(responseReferences)) {
+    return [];
+  }
+
+  return Object.entries(responseReferences).flatMap(
+    ([statusCode, reference]) => {
+      if (typeof reference?.ref !== "string") {
+        return [];
+      }
+
+      return [
+        {
+          reference: reference.ref,
+          label: `Response ${statusCode}`,
+          sourcePointer: reference.sourcePointer ||
+            `${sourcePointer || "#"}/responses/${statusCode}`,
+        },
+      ];
+    }
+  );
+};
+
+const getParameterReferenceEntries = (parameters) => {
+  if (!Array.isArray(parameters)) {
+    return [];
+  }
+
+  return parameters.flatMap((parameter, index) => {
+    const reference = parameter?.reference;
+
+    if (typeof reference?.ref !== "string") {
+      return [];
+    }
+
+    return [
+      {
+        reference: reference.ref,
+        label: `Parameter ${index + 1}: ${
+          parameter.name || "Unnamed"
+        } (${parameter.in || "unknown location"})`,
+        sourcePointer: reference.sourcePointer,
+      },
+    ];
+  });
+};
+
 const OperationDetails = ({
   specification,
+  specVersionId,
   operationQuery,
 }) => {
   if (operationQuery.isPending) {
@@ -588,6 +687,69 @@ const OperationDetails = ({
     Object.keys(operation.resolvedResponses).length > 0
       ? operation.resolvedResponses
       : operation.responses;
+
+  /*
+   * Keep raw and resolved objects separate.
+   * Raw responses contain the original $ref values.
+   * Resolved responses contain the backend's inspected targets.
+   */
+  const referenceRoots = [
+    {
+      label: "Original operation definition",
+      pointer: operation.sourcePointer,
+      value: operation.operation || operation,
+    },
+    {
+      label: "Raw response definitions",
+      pointer: `${operation.sourcePointer || "#"}/responses`,
+      value: operation.responses,
+    },
+    {
+      label: "Resolved response definitions",
+      pointer: `${operation.sourcePointer || "#"}/resolvedResponses`,
+      value: operation.resolvedResponses,
+    },
+    {
+      label: "Raw request body",
+      pointer: `${operation.sourcePointer || "#"}/requestBody`,
+      value: operation.requestBody,
+    },
+    {
+      label: "Resolved request body",
+      pointer: `${operation.sourcePointer || "#"}/resolvedRequestBody`,
+      value: operation.resolvedRequestBody,
+    },
+    {
+      label: "Operation parameters",
+      pointer: `${operation.sourcePointer || "#"}/parameters`,
+      value: operation.parameters,
+    },
+  ];
+
+  /*
+   * Explicit metadata ensures that top-level response
+   * references are discoverable even when the response
+   * is already represented by a resolved object elsewhere.
+   */
+  const explicitReferences = [
+    ...getParameterReferenceEntries(operation.parameters),
+
+    ...(operation.requestBodyReference?.ref
+      ? [
+          {
+            reference: operation.requestBodyReference.ref,
+            label: "Request body",
+            sourcePointer:
+              operation.requestBodyReference.sourcePointer,
+          },
+        ]
+      : []),
+
+    ...getResponseReferenceEntries(
+      operation.responseReferences,
+      operation.sourcePointer
+    ),
+  ];
 
   return (
     <div className="explorer-operation-detail">
@@ -644,7 +806,9 @@ const OperationDetails = ({
       <div className="explorer-operation-stat-grid">
         <div>
           <span>Operation ID</span>
-          <strong>{operation.operationId || "Not provided"}</strong>
+          <strong>
+            {operation.operationId || "Not provided"}
+          </strong>
         </div>
 
         <div>
@@ -654,12 +818,16 @@ const OperationDetails = ({
 
         <div>
           <span>Request body</span>
-          <strong>{operation.hasRequestBody ? "Defined" : "Not defined"}</strong>
+          <strong>
+            {operation.hasRequestBody ? "Defined" : "Not defined"}
+          </strong>
         </div>
 
         <div>
           <span>Documented responses</span>
-          <strong>{Object.keys(responses || {}).length}</strong>
+          <strong>
+            {Object.keys(responses || {}).length}
+          </strong>
         </div>
       </div>
 
@@ -671,7 +839,9 @@ const OperationDetails = ({
             description="Path-level and operation-level parameters resolved by the backend."
           />
 
-          <ParameterSection parameters={operation.parameters || EMPTY_ARRAY} />
+          <ParameterSection
+            parameters={operation.parameters || EMPTY_ARRAY}
+          />
         </section>
 
         <section className="explorer-detail-section">
@@ -713,12 +883,16 @@ const OperationDetails = ({
           <div className="explorer-additional-grid">
             <div>
               <h4>Security requirements</h4>
-              <CodePreview value={operation.security || EMPTY_ARRAY} />
+              <CodePreview
+                value={operation.security || EMPTY_ARRAY}
+              />
             </div>
 
             <div>
               <h4>Server definitions</h4>
-              <CodePreview value={operation.servers || EMPTY_ARRAY} />
+              <CodePreview
+                value={operation.servers || EMPTY_ARRAY}
+              />
             </div>
           </div>
         </section>
@@ -729,10 +903,20 @@ const OperationDetails = ({
         </section>
       </div>
 
+      <ReferenceNavigator
+        key={operation.operationKey}
+        specVersionId={specVersionId}
+        title="Operation reference navigator"
+        roots={referenceRoots}
+        explicitReferences={explicitReferences}
+      />
+
       {specification?.explorerCompleteness === "PARTIAL" && (
         <div className="explorer-detail-partial-note">
           <AlertCircle size={15} />
-          This operation belongs to a specification with partial Explorer coverage.
+
+          This operation belongs to a specification with
+          partial Explorer coverage.
         </div>
       )}
     </div>
@@ -744,14 +928,16 @@ const ComponentsBrowser = ({
   componentCategories,
 }) => {
   const [componentType, setComponentType] = useState("schemas");
-  const [selectedComponentName, setSelectedComponentName] = useState("");
+  const [selectedComponentName, setSelectedComponentName] =
+    useState("");
   const [search, setSearch] = useState("");
 
   const categories = componentCategories || EMPTY_ARRAY;
 
   const availableCategory =
-    categories.find((category) => category.type === componentType) ||
-    categories[0];
+    categories.find(
+      (category) => category.type === componentType
+    ) || categories[0];
 
   const activeComponentType =
     availableCategory?.type || componentType;
@@ -767,17 +953,13 @@ const ComponentsBrowser = ({
   const filteredComponents = useMemo(() => {
     const value = search.trim().toLowerCase();
 
-    if (!value) {
-      return components;
-    }
+    if (!value) return components;
 
-    return components.filter((component) => {
-      return (
-        component.name.toLowerCase().includes(value) ||
-        component.pointer.toLowerCase().includes(value) ||
-        (component.description || "").toLowerCase().includes(value)
-      );
-    });
+    return components.filter((component) => (
+      component.name.toLowerCase().includes(value) ||
+      component.pointer.toLowerCase().includes(value) ||
+      (component.description || "").toLowerCase().includes(value)
+    ));
   }, [components, search]);
 
   const selectedComponent = components.find(
@@ -828,9 +1010,12 @@ const ComponentsBrowser = ({
             }}
           >
             {categories.map((category) => (
-              <option key={category.type} value={category.type}>
-                {COMPONENT_LABELS[category.type] || category.type}
-                {" "}({category.count})
+              <option
+                key={category.type}
+                value={category.type}
+              >
+                {COMPONENT_LABELS[category.type] ||
+                  category.type} ({category.count})
               </option>
             ))}
           </select>
@@ -878,9 +1063,17 @@ const ComponentsBrowser = ({
               <button
                 type="button"
                 key={component.name}
-                className={`explorer-component-item ${component.name === activeComponentName ? "is-active" : ""}`}
-                onClick={() => setSelectedComponentName(component.name)}
-                aria-pressed={component.name === activeComponentName}
+                className={`explorer-component-item ${
+                  component.name === activeComponentName
+                    ? "is-active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setSelectedComponentName(component.name)
+                }
+                aria-pressed={
+                  component.name === activeComponentName
+                }
               >
                 <span className="explorer-component-item-icon">
                   <Braces size={15} />
@@ -888,8 +1081,12 @@ const ComponentsBrowser = ({
 
                 <span className="explorer-component-item-copy">
                   <strong>{component.name}</strong>
+
                   <span>
-                    {component.type || (component.isReference ? "Reference" : "Component")}
+                    {component.type ||
+                      (component.isReference
+                        ? "Reference"
+                        : "Component")}
                   </span>
                 </span>
               </button>
@@ -906,8 +1103,10 @@ const ComponentsBrowser = ({
             </div>
 
             <h3>No components available</h3>
+
             <p>
-              This specification does not define components in the selected category.
+              This specification does not define components
+              in the selected category.
             </p>
           </div>
         ) : componentQuery.isPending ? (
@@ -924,7 +1123,8 @@ const ComponentsBrowser = ({
           <>
             <div className="explorer-component-detail-header">
               <span className="eyebrow">
-                {COMPONENT_LABELS[activeComponentType] || activeComponentType}
+                {COMPONENT_LABELS[activeComponentType] ||
+                  activeComponentType}
               </span>
 
               <h2>{componentData.componentName}</h2>
@@ -951,12 +1151,15 @@ const ComponentsBrowser = ({
                 <code>{componentData.reference.ref}</code>
 
                 <span>
-                  Target: {componentData.reference.targetPointer || "Unresolved"}
+                  Target:{" "}
+                  {componentData.reference.targetPointer ||
+                    "Unresolved"}
                 </span>
 
                 {componentData.reference.circular && (
                   <span className="explorer-reference-warning">
-                    This reference is circular. The original reference definition is shown.
+                    This reference is circular. The original
+                    reference definition is shown.
                   </span>
                 )}
               </div>
@@ -965,7 +1168,9 @@ const ComponentsBrowser = ({
             <div className="explorer-component-summary-grid">
               <div>
                 <span>Type</span>
-                <strong>{getSchemaType(componentValue)}</strong>
+                <strong>
+                  {getSchemaType(componentValue)}
+                </strong>
               </div>
 
               <div>
@@ -996,14 +1201,21 @@ const ComponentsBrowser = ({
 
                 <div className="explorer-property-list">
                   {properties.map(([name, schema]) => (
-                    <div className="explorer-property-item" key={name}>
+                    <div
+                      className="explorer-property-item"
+                      key={name}
+                    >
                       <div>
                         <strong>{name}</strong>
 
                         {requiredProperties.includes(name) ? (
-                          <span className="explorer-required">Required</span>
+                          <span className="explorer-required">
+                            Required
+                          </span>
                         ) : (
-                          <span className="explorer-optional">Optional</span>
+                          <span className="explorer-optional">
+                            Optional
+                          </span>
                         )}
                       </div>
 
@@ -1030,7 +1242,7 @@ const ComponentsBrowser = ({
               <CodePreview value={componentData.component} />
             </section>
 
-            {componentData.reference && (
+            {componentData.resolvedComponent !== undefined && (
               <section className="explorer-component-definition">
                 <SectionHeader
                   eyebrow="REFERENCE RESOLUTION"
@@ -1038,9 +1250,46 @@ const ComponentsBrowser = ({
                   description="The backend's resolved representation of this component."
                 />
 
-                <CodePreview value={componentData.resolvedComponent} />
+                <CodePreview
+                  value={componentData.resolvedComponent}
+                />
               </section>
             )}
+
+            <ReferenceNavigator
+              key={`${componentData.componentType}:${componentData.componentName}`}
+              specVersionId={specVersionId}
+              title="Component reference navigator"
+              roots={[
+                {
+                  label: "Original component",
+                  pointer: componentData.pointer,
+                  value: componentData.component,
+                },
+                ...(componentData.resolvedComponent !== undefined
+                  ? [
+                      {
+                        label: "Resolved component",
+                        pointer:
+                          componentData.reference?.targetPointer ||
+                          componentData.pointer,
+                        value: componentData.resolvedComponent,
+                      },
+                    ]
+                  : []),
+              ]}
+              explicitReferences={
+                componentData.reference?.ref
+                  ? [
+                      {
+                        reference: componentData.reference.ref,
+                        label: "Component reference",
+                        sourcePointer: componentData.pointer,
+                      },
+                    ]
+                  : []
+              }
+            />
           </>
         )}
       </section>
@@ -1052,18 +1301,22 @@ const ApiExplorerPage = () => {
   const { projectId, specVersionId } = useParams();
 
   const [activeTab, setActiveTab] = useState("operations");
-  const [selectedOperationKey, setSelectedOperationKey] = useState("");
+  const [selectedOperationKey, setSelectedOperationKey] =
+    useState("");
   const [search, setSearch] = useState("");
   const [methodFilter, setMethodFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
 
   const projectQuery = useProject(projectId);
-  const operationsQuery = useSpecificationOperations(specVersionId);
+
+  const operationsQuery =
+    useSpecificationOperations(specVersionId);
 
   const operations =
     operationsQuery.data?.operations ?? EMPTY_ARRAY;
 
-  const specification = operationsQuery.data?.specification;
+  const specification =
+    operationsQuery.data?.specification;
 
   const schemas =
     operationsQuery.data?.schemas ?? EMPTY_ARRAY;
@@ -1071,35 +1324,39 @@ const ApiExplorerPage = () => {
   const componentCategories =
     operationsQuery.data?.componentCategories ?? EMPTY_ARRAY;
 
-  const activeOperationKey =
-    operations.some(
-      (operation) => operation.operationKey === selectedOperationKey
-    )
-      ? selectedOperationKey
-      : operations[0]?.operationKey || "";
+  const activeOperationKey = operations.some(
+    (operation) =>
+      operation.operationKey === selectedOperationKey
+  )
+    ? selectedOperationKey
+    : operations[0]?.operationKey || "";
 
   const operationQuery = useSpecificationOperation(
     specVersionId,
     activeOperationKey
   );
 
-  const methodOptions = useMemo(() => {
-    return [
+  const methodOptions = useMemo(
+    () => [
       ...new Set(
         operations.map((operation) =>
           String(operation.method).toUpperCase()
         )
       ),
-    ].sort();
-  }, [operations]);
+    ].sort(),
+    [operations]
+  );
 
-  const tagOptions = useMemo(() => {
-    return [
+  const tagOptions = useMemo(
+    () => [
       ...new Set(
-        operations.flatMap((operation) => operation.tags || EMPTY_ARRAY)
+        operations.flatMap(
+          (operation) => operation.tags || EMPTY_ARRAY
+        )
       ),
-    ].sort((left, right) => left.localeCompare(right));
-  }, [operations]);
+    ].sort((left, right) => left.localeCompare(right)),
+    [operations]
+  );
 
   const filteredOperations = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1131,8 +1388,8 @@ const ApiExplorerPage = () => {
     });
   }, [operations, search, methodFilter, tagFilter]);
 
-  const operationGroups = useMemo(() => {
-    return filteredOperations.reduce((groups, operation) => {
+  const operationGroups = useMemo(
+    () => filteredOperations.reduce((groups, operation) => {
       const group = operation.tags?.[0] || "Untagged";
 
       if (!groups[group]) {
@@ -1142,18 +1399,20 @@ const ApiExplorerPage = () => {
       groups[group].push(operation);
 
       return groups;
-    }, {});
-  }, [filteredOperations]);
+    }, {}),
+    [filteredOperations]
+  );
 
-  const methodCounts = useMemo(() => {
-    return operations.reduce((counts, operation) => {
+  const methodCounts = useMemo(
+    () => operations.reduce((counts, operation) => {
       const method = operation.method.toUpperCase();
 
       counts[method] = (counts[method] || 0) + 1;
 
       return counts;
-    }, {});
-  }, [operations]);
+    }, {}),
+    [operations]
+  );
 
   const clearFilters = () => {
     setSearch("");
@@ -1230,11 +1489,15 @@ const ApiExplorerPage = () => {
           </div>
 
           <div>
-            <span className="eyebrow">SPECIFICATION WORKSPACE</span>
+            <span className="eyebrow">
+              SPECIFICATION WORKSPACE
+            </span>
+
             <h1>API Explorer</h1>
 
             <p>
-              Explore operations, request and response contracts, and reusable components.
+              Explore operations, request and response
+              contracts, and reusable components.
             </p>
           </div>
         </div>
@@ -1270,11 +1533,15 @@ const ApiExplorerPage = () => {
 
         <div>
           <span>Uploaded</span>
-          <strong>{formatDate(specification?.createdAt)}</strong>
+          <strong>
+            {formatDate(specification?.createdAt)}
+          </strong>
         </div>
 
         <div className="explorer-overview-status">
-          <CoverageBadge status={specification?.explorerCompleteness} />
+          <CoverageBadge
+            status={specification?.explorerCompleteness}
+          />
         </div>
       </section>
 
@@ -1289,7 +1556,9 @@ const ApiExplorerPage = () => {
               type="button"
               role="tab"
               aria-selected={activeTab === "operations"}
-              className={activeTab === "operations" ? "is-active" : ""}
+              className={
+                activeTab === "operations" ? "is-active" : ""
+              }
               onClick={() => setActiveTab("operations")}
             >
               <Code2 size={15} />
@@ -1301,7 +1570,9 @@ const ApiExplorerPage = () => {
               type="button"
               role="tab"
               aria-selected={activeTab === "components"}
-              className={activeTab === "components" ? "is-active" : ""}
+              className={
+                activeTab === "components" ? "is-active" : ""
+              }
               onClick={() => setActiveTab("components")}
             >
               <Braces size={15} />
@@ -1323,7 +1594,10 @@ const ApiExplorerPage = () => {
             <aside className="explorer-operations-sidebar">
               <div className="explorer-sidebar-heading">
                 <div>
-                  <span className="eyebrow">ENDPOINT CATALOG</span>
+                  <span className="eyebrow">
+                    ENDPOINT CATALOG
+                  </span>
+
                   <h2>Operations</h2>
                 </div>
 
@@ -1337,7 +1611,9 @@ const ApiExplorerPage = () => {
                   type="search"
                   placeholder="Search path, tag or operation..."
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) =>
+                    setSearch(event.target.value)
+                  }
                   aria-label="Search operations"
                 />
 
@@ -1361,7 +1637,9 @@ const ApiExplorerPage = () => {
                 <select
                   id="operation-method-filter"
                   value={methodFilter}
-                  onChange={(event) => setMethodFilter(event.target.value)}
+                  onChange={(event) =>
+                    setMethodFilter(event.target.value)
+                  }
                 >
                   <option value="all">All methods</option>
 
@@ -1382,7 +1660,9 @@ const ApiExplorerPage = () => {
                 <select
                   id="operation-tag-filter"
                   value={tagFilter}
-                  onChange={(event) => setTagFilter(event.target.value)}
+                  onChange={(event) =>
+                    setTagFilter(event.target.value)
+                  }
                 >
                   <option value="all">All tags</option>
 
@@ -1394,7 +1674,9 @@ const ApiExplorerPage = () => {
                 </select>
               </div>
 
-              {(search || methodFilter !== "all" || tagFilter !== "all") && (
+              {(search ||
+                methodFilter !== "all" ||
+                tagFilter !== "all") && (
                 <button
                   type="button"
                   className="explorer-clear-filters"
@@ -1410,35 +1692,40 @@ const ApiExplorerPage = () => {
                   <div className="explorer-list-empty">
                     <Search size={19} />
                     <strong>No operations found</strong>
-                    <span>Try changing the search or filters.</span>
+                    <span>
+                      Try changing the search or filters.
+                    </span>
                   </div>
                 ) : (
-                  Object.entries(operationGroups).map(([group, items]) => (
-                    <section
-                      className="explorer-operation-group"
-                      key={group}
-                    >
-                      <div className="explorer-group-heading">
-                        <span>{group}</span>
-                        <span>{items.length}</span>
-                      </div>
+                  Object.entries(operationGroups).map(
+                    ([group, items]) => (
+                      <section
+                        className="explorer-operation-group"
+                        key={group}
+                      >
+                        <div className="explorer-group-heading">
+                          <span>{group}</span>
+                          <span>{items.length}</span>
+                        </div>
 
-                      {items.map((operation) => (
-                        <OperationListItem
-                          key={operation.operationKey}
-                          operation={operation}
-                          isActive={
-                            operation.operationKey === activeOperationKey
-                          }
-                          onClick={() => {
-                            setSelectedOperationKey(
-                              operation.operationKey
-                            );
-                          }}
-                        />
-                      ))}
-                    </section>
-                  ))
+                        {items.map((operation) => (
+                          <OperationListItem
+                            key={operation.operationKey}
+                            operation={operation}
+                            isActive={
+                              operation.operationKey ===
+                              activeOperationKey
+                            }
+                            onClick={() => {
+                              setSelectedOperationKey(
+                                operation.operationKey
+                              );
+                            }}
+                          />
+                        ))}
+                      </section>
+                    )
+                  )
                 )}
               </div>
             </aside>
@@ -1451,13 +1738,16 @@ const ApiExplorerPage = () => {
                   </div>
 
                   <h3>No indexed operations</h3>
+
                   <p>
-                    This specification does not contain any operations represented by the current Explorer.
+                    This specification does not contain any
+                    operations represented by the current Explorer.
                   </p>
                 </div>
               ) : (
                 <OperationDetails
                   specification={specification}
+                  specVersionId={specVersionId}
                   operationQuery={operationQuery}
                 />
               )}

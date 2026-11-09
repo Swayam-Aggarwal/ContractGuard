@@ -1,10 +1,13 @@
-
 # Implementation Plan and Development Tracker
 
-**Product:** ContractGuard  
-**Document version:** 1.1  
-**Status:** Revised implementation baseline  
-**Development approach:** Incremental, test-driven modular monolith  
+**Product:** ContractGuard
+
+**Document version:** 1.2
+
+**Status:** Active development tracker — updated 10 November 2026
+
+**Development approach:** Incremental, test-driven modular monolith
+
 **Primary language:** JavaScript
 
 ## 1. Purpose
@@ -28,16 +31,27 @@ The application must not be built as one large code-generation exercise. Each mo
 ## 2. Development principles
 
 1. **Finalize before implementing:** The product scope, architecture, security boundaries, and core data relationships must be reviewed before application development begins.
+
 2. **Build incrementally:** Implement one feature group at a time.
+
 3. **Test domain logic independently:** Compatibility rules must work without Express, MongoDB, React, or AI.
+
 4. **Preserve architectural boundaries:** Parsing, normalization, comparison, traceability, and execution are separate responsibilities.
+
 5. **Use JavaScript throughout:** TypeScript is excluded.
+
 6. **Do not add unnecessary infrastructure:** No Redis, Kafka, Kubernetes, microservices, or Docker prerequisites.
+
 7. **AI is optional:** The product remains fully usable without AI configuration.
+
 8. **Prefer deterministic behavior:** The same supported inputs and ruleset must generate the same comparison findings.
+
 9. **Document limitations:** Unsupported constructs and partial results must remain visible.
+
 10. **Use actual evidence:** Performance and accuracy claims must be supported by reproducible tests.
+
 11. **Preserve history:** Specification versions, comparison findings, and completed test-run evidence must remain immutable.
+
 12. **Understand before expanding:** The developer must be able to explain the purpose, data flow, and limitations of each implemented module.
 
 ## 3. Implementation priority definitions
@@ -56,17 +70,29 @@ The PRD is the source of truth for product scope and priorities.
 
 ```mermaid
 flowchart TD
+
     P0["Phase 0: Documentation Review and Freeze"]
+
     P1["Phase 1: Repository and Application Foundation"]
+
     P2["Phase 2: Authentication and Project Management"]
+
     P3["Phase 3: OpenAPI Ingestion and Normalization"]
+
     P4["Phase 4: API Explorer"]
+
     P5["Phase 5: Compatibility Engine"]
+
     P6["Phase 6: Change-to-Test Traceability"]
+
     P7["Phase 7: Bundled Regression Runner"]
+
     P8["Phase 8: Optional AI Test Suggestions"]
+
     P9["Phase 9: Complete Frontend Workflows"]
+
     P10["Phase 10: Security, Testing and Performance Review"]
+
     P11["Phase 11: CI, Deployment and Release"]
 
     P0 --> P1
@@ -90,8 +116,9 @@ The core domain modules should be implemented and tested before their complete U
 
 ## 5. Phase 0 — Documentation review and freeze
 
-**Priority:** P0  
-**Status:** In progress before application development
+**Priority:** P0
+
+**Status:** Baseline established; final cross-document consistency review remains pending.
 
 ### Objective
 
@@ -285,6 +312,8 @@ Implement user authentication, protected application access, project ownership, 
 
 Accept bounded OpenAPI JSON/YAML documents and convert supported content into a reliable internal representation.
 
+**Current status:** Partially verified. Both bundled Demo Store YAML versions (1.0.0 and 2.0.0) have been uploaded successfully and appear in project version history. The backend test suite has passed. The complete Phase 3 acceptance checklist has not been audited item by item in this tracker.
+
 ### 8.1 Upload processing
 
 - [ ] Install and configure Multer.
@@ -375,41 +404,68 @@ Accept bounded OpenAPI JSON/YAML documents and convert supported content into a 
 
 **Priority:** P0
 
+**Status:** Core workflows implemented and browser-verified; final acceptance review remains partially open.
+
 ### Objective
 
 Allow developers to inspect uploaded specification versions and navigate supported operations and schemas.
 
 ### Tasks
 
-- [ ] Implement operation-list retrieval.
-- [ ] Implement operation-detail retrieval.
-- [ ] Display paths and HTTP methods.
-- [ ] Display operation summaries and descriptions.
-- [ ] Display path, query, header, and supported cookie parameters.
-- [ ] Display request bodies.
-- [ ] Display response definitions.
-- [ ] Display supported schema details.
-- [ ] Implement internal-reference navigation.
-- [ ] Display unsupported constructs.
-- [ ] Display source JSON Pointer information.
-- [ ] Build the API Explorer layout.
-- [ ] Implement method and path filters.
-- [ ] Add empty, loading, error, and partial states.
-- [ ] Verify that specification content is rendered as safe text.
+- [x] Implement operation-list retrieval.
+- [x] Implement operation-detail retrieval.
+- [x] Display paths and HTTP methods.
+- [x] Display operation summaries and descriptions.
+- [~] Display path, query, header, and supported cookie parameters. Path and query parameters were observed; header and cookie cases still need explicit verification.
+- [~] Display request bodies. The no-request-body state was verified; a fixture containing a non-empty request body still needs verification.
+- [x] Display response definitions.
+- [x] Display supported schema details.
+- [x] Implement internal-reference navigation.
+- [~] Display unsupported constructs. The diagnostic UI exists; an unsupported-construct fixture still needs an end-to-end check.
+- [x] Display source JSON Pointer information.
+- [x] Build the API Explorer layout.
+- [~] Implement method and path filters. Controls are present; their filtering behavior still needs an explicit browser check.
+- [~] Add empty, loading, error, and partial states. The states are implemented, but each has not been independently exercised in the browser.
+- [~] Verify that specification content is rendered as safe text. Rendering uses text/JSON presentation; a dedicated hostile-content verification remains outstanding.
 
 ### Acceptance criteria
 
-- A user can navigate operations in a valid uploaded specification.
-- Supported parameters, request bodies, and responses are inspectable.
-- Internal schema references can be followed within the supported subset.
-- Unsupported information is visibly identified.
-- Explorer actions never execute uploaded server URLs.
+- [x] A user can navigate operations in a valid uploaded specification.
+- [~] Supported parameters, request bodies, and responses are inspectable. Parameters and responses were verified; a non-empty request-body fixture remains to be tested.
+- [x] Internal schema references can be followed within the supported subset. Product and Error references were resolved in version 2.0.0; Product was resolved in version 1.0.0.
+- [~] Unsupported information is visibly identified. The warning/diagnostic presentation still needs an end-to-end test with an intentionally unsupported construct.
+- [~] Explorer actions never execute uploaded server URLs. The application reports that external references and uploaded server URLs are not contacted; dedicated security-test evidence remains to be recorded.
 
 **Milestone:** Working read-only API Explorer.
 
+### Verification record — 10 November 2026
+
+**Automated verification recorded:**
+
+- Backend: `npm test` passed — 28 test files and 290 tests.
+- Frontend: `npm run lint` passed.
+- Frontend: `npm run build` passed using Vite 8.3.6; 2,299 modules were transformed.
+
+**Browser verification recorded:**
+
+- Demo Store specification 2.0.0: operation list/detail, parameters, response definitions, component browsing, Product and Error reference resolution, target pointers, and resolution chains were inspected.
+- Demo Store specification 1.0.0: operation list/detail, component browsing, and Product reference resolution were inspected.
+- The reference navigator groups duplicate `$ref` values while retaining distinct source locations. The 2.0.0 browser check showed two unique references and four source locations; both references resolved after grouping.
+
+**Remaining Phase 4 checks:**
+
+- Verify a non-empty request body using a suitable supported fixture.
+- Exercise method and path filters.
+- Exercise an unsupported-construct/partial-coverage case.
+- Exercise loading and error states where practical.
+- Record dedicated security-test evidence confirming that external references and uploaded server URLs are never fetched or executed.
+
+The Phase 4 milestone remains partially verified until these remaining checks are completed. The compatibility engine in Phase 5 has not been completed by this Explorer work.
+
 ## 10. Phase 5 — Compatibility engine
 
-**Priority:** P0  
+**Priority:** P0
+
 **Critical technical milestone**
 
 ### Objective
@@ -619,7 +675,8 @@ Connect compatibility findings to affected operations and the corresponding base
 
 ## 12. Phase 7 — Bundled regression runner
 
-**Priority:** P0  
+**Priority:** P0
+
 **Critical technical milestone**
 
 ### Objective
@@ -1038,12 +1095,12 @@ Update a task to:
 
 | Phase | Deliverable | Priority | Status |
 |---|---|---|---|
-| 0 | Documentation review and freeze | P0 | Pending |
-| 1 | Repository and application foundation | P0 | Pending |
-| 2 | Authentication and project management | P0 | Pending |
-| 3 | OpenAPI ingestion and normalization | P0 | Pending |
-| 4 | API Explorer | P0 | Pending |
-| 5 | Compatibility engine | P0 | Pending |
+| 0 | Documentation review and freeze | P0 | In progress — baseline exists; final cross-document consistency review is pending |
+| 1 | Repository and application foundation | P0 | Partially verified — client, server, and MongoDB run locally; full acceptance checklist not re-audited |
+| 2 | Authentication and project management | P0 | Partially verified — authenticated project workspace is in use; full security/ownership acceptance checklist not re-audited |
+| 3 | OpenAPI ingestion and normalization | P0 | Partially verified — both Demo Store YAML versions uploaded; full ingestion acceptance checklist not re-audited |
+| 4 | API Explorer | P0 | Core flows browser-verified; remaining acceptance checks listed in Phase 4 verification record |
+| 5 | Compatibility engine | P0 | Pending — next major implementation phase |
 | 6 | Change-to-test traceability | P0 | Pending |
 | 7 | Bundled regression runner | P0 | Pending |
 | 8 | Optional AI test suggestions | P1 | Pending |
@@ -1069,10 +1126,10 @@ Update a task to:
 
 | Milestone | Evidence required | Status |
 |---|---|---|
-| M1: Application foundation | Working client/server/DB connection | Pending |
-| M2: Authentication | Registration, login, ownership tests | Pending |
-| M3: OpenAPI ingestion | Validated immutable specification version | Pending |
-| M4: API Explorer | Navigable supported operations | Pending |
+| M1: Application foundation | Working client/server/DB connection | Partially verified — client, server, and MongoDB startup observed locally |
+| M2: Authentication | Registration, login, ownership tests | Partially verified — authenticated workspace observed; full auth/ownership test evidence not audited here |
+| M3: OpenAPI ingestion | Validated immutable specification version | Partially verified — both Demo Store YAML versions uploaded and listed |
+| M4: API Explorer | Navigable supported operations | Core browser flows verified on Demo Store 1.0.0 and 2.0.0; remaining checks listed in Phase 4 |
 | M5: Compatibility engine | Passing directional rule fixtures | Pending |
 | M6: Traceability | Change-to-operation-to-test mapping | Pending |
 | M7: Regression runner | Baseline response validation against candidate | Pending |
@@ -1203,7 +1260,7 @@ ContractGuard v1 is complete only when:
 10. Changes connect to the relevant baseline test cases.
 11. Coverage distinguishes approved, draft-only, and uncovered states.
 12. Users can create, review, approve, and archive test cases.
-13. Only approved baseline cases execute.
+13. Only approved cases execute.
 14. The runner uses the trusted bundled candidate implementation.
 15. Candidate responses are validated against baseline response schemas.
 16. Every run is linked to an exact comparison and preserves execution evidence.
@@ -1220,7 +1277,7 @@ ContractGuard v1 is complete only when:
 
 ## 22. Progress management
 
-This document is the central tracker.
+This document is the central tracker. Last progress update: 10 November 2026.
 
 Do not create a second independent TODO list that can become inconsistent.
 
