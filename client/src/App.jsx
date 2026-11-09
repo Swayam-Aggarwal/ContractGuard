@@ -1,4 +1,8 @@
+
+import { lazy, Suspense } from "react";
+
 import {
+  Link,
   Navigate,
   Route,
   Routes,
@@ -11,11 +15,33 @@ import {
   PublicOnlyRoute,
 } from "./components/ProtectedRoute.jsx";
 
-import AuthPage from "./pages/AuthPage.jsx";
-import ProjectsPage from "./pages/ProjectsPage.jsx";
-import ProjectPage from "./pages/ProjectPage.jsx";
-
 import "./App.css";
+
+// Load page modules only when their routes are visited.
+const AuthPage = lazy(() => import("./pages/AuthPage.jsx"));
+const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
+const ProjectPage = lazy(() => import("./pages/ProjectPage.jsx"));
+const ApiExplorerPage = lazy(() => import("./pages/ApiExplorerPage.jsx"));
+const ComparisonPage = lazy(() => import("./pages/ComparisonPage.jsx"));
+const DiffReportPage = lazy(() => import("./pages/DiffReportPage.jsx"));
+
+const RouteLoading = () => (
+  <main
+    role="status"
+    aria-live="polite"
+    style={{
+      display: "grid",
+      minHeight: "55vh",
+      placeItems: "center",
+      padding: "24px",
+      color: "#718096",
+      fontSize: "13px",
+      fontWeight: 600,
+    }}
+  >
+    Loading workspace...
+  </main>
+);
 
 const NotFoundPage = () => (
   <main className="not-found-page">
@@ -27,55 +53,68 @@ const NotFoundPage = () => (
       The page may have moved or the address may be incorrect.
     </p>
 
-    <NavigateToProjects />
+    <Link to="/projects" className="button button-primary">
+      Return to projects
+    </Link>
   </main>
-);
-
-const NavigateToProjects = () => (
-  <a href="/projects" className="button button-primary">
-    Return to projects
-  </a>
 );
 
 const App = () => {
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={<Navigate to="/projects" replace />}
-      />
-
-      <Route element={<PublicOnlyRoute />}>
+    <Suspense fallback={<RouteLoading />}>
+      <Routes>
         <Route
-          path="/login"
-          element={<AuthPage key="login" mode="login" />}
+          path="/"
+          element={<Navigate to="/projects" replace />}
         />
 
-        <Route
-          path="/register"
-          element={<AuthPage key="register" mode="register" />}
-        />
-      </Route>
-
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
+        <Route element={<PublicOnlyRoute />}>
           <Route
-            path="/projects"
-            element={<ProjectsPage />}
+            path="/login"
+            element={<AuthPage key="login" mode="login" />}
           />
 
           <Route
-            path="/projects/:projectId"
-            element={<ProjectPage />}
+            path="/register"
+            element={<AuthPage key="register" mode="register" />}
           />
         </Route>
-      </Route>
 
-      <Route
-        path="*"
-        element={<NotFoundPage />}
-      />
-    </Routes>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route
+              path="/projects"
+              element={<ProjectsPage />}
+            />
+
+            <Route
+              path="/projects/:projectId"
+              element={<ProjectPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/specifications/:specVersionId/explorer"
+              element={<ApiExplorerPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/comparisons"
+              element={<ComparisonPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/diff-reports/:reportId"
+              element={<DiffReportPage />}
+            />
+          </Route>
+        </Route>
+
+        <Route
+          path="*"
+          element={<NotFoundPage />}
+        />
+      </Routes>
+    </Suspense>
   );
 };
 

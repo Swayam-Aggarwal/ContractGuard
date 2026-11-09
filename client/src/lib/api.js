@@ -1,3 +1,4 @@
+
 export class ApiError extends Error {
   constructor(status, code, message, details = []) {
     super(message);
@@ -5,9 +6,16 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.code = code;
-    this.details = details;
+    this.details = Array.isArray(details) ? details : [];
   }
 }
+
+const isFormData = (value) => {
+  return (
+    typeof FormData !== "undefined" &&
+    value instanceof FormData
+  );
+};
 
 export const apiRequest = async (
   path,
@@ -18,27 +26,39 @@ export const apiRequest = async (
     signal,
   } = {}
 ) => {
+  const bodyIsFormData = isFormData(body);
+  const requestHeaders = new Headers(headers);
+
+  if (!requestHeaders.has("Accept")) {
+    requestHeaders.set("Accept", "application/json");
+  }
+
+  // Let the browser add the multipart boundary for FormData requests.
+  if (
+    body !== undefined &&
+    !bodyIsFormData &&
+    !requestHeaders.has("Content-Type")
+  ) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
   let response;
 
   try {
     response = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: {
-        Accept: "application/json",
-        ...(body !== undefined
-          ? { "Content-Type": "application/json" }
-          : {}),
-        ...headers,
-      },
+      headers: requestHeaders,
       body:
-        body !== undefined
-          ? JSON.stringify(body)
-          : undefined,
+        body === undefined
+          ? undefined
+          : bodyIsFormData
+            ? body
+            : JSON.stringify(body),
       signal,
     });
   } catch (error) {
-    if (error.name === "AbortError") {
+    if (error?.name === "AbortError") {
       throw error;
     }
 
@@ -52,17 +72,22 @@ export const apiRequest = async (
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const error = payload?.error;
+    const apiError = payload?.error;
 
     throw new ApiError(
       response.status,
-      error?.code || "REQUEST_FAILED",
-      error?.message || "The request could not be completed.",
-      error?.details || []
+      apiError?.code || "REQUEST_FAILED",
+      apiError?.message || "The request could not be completed.",
+      apiError?.details || []
     );
   }
 
-  if (payload?.success !== true || !payload.data) {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    payload.success !== true ||
+    !Object.hasOwn(payload, "data")
+  ) {
     throw new ApiError(
       response.status,
       "INVALID_API_RESPONSE",

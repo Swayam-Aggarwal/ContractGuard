@@ -39,6 +39,33 @@ const isSubset = (subset, superset) => {
   );
 };
 
+// JSON Schema's "number" type includes integers. Keep this relationship
+// explicit when comparing type sets so integer -> number is an expansion,
+// while number -> integer is a narrowing.
+const isJsonSchemaTypeSubset = (subsetType, supersetType) => {
+  return (
+    subsetType === supersetType ||
+    (subsetType === "integer" && supersetType === "number")
+  );
+};
+
+const isTypeSubset = (subset, superset) => {
+  return subset.every((type) =>
+    superset.some((candidate) =>
+      isJsonSchemaTypeSubset(type, candidate)
+    )
+  );
+};
+
+const typeSetsOverlap = (left, right) => {
+  return left.some((leftType) =>
+    right.some((rightType) =>
+      isJsonSchemaTypeSubset(leftType, rightType) ||
+      isJsonSchemaTypeSubset(rightType, leftType)
+    )
+  );
+};
+
 const makeWarning = (field, message) => ({
   field,
   message,
@@ -330,27 +357,47 @@ const compareSchemas = (
       serialize(oldTypes && [...oldTypes].sort()) !==
       serialize(newTypes && [...newTypes].sort())
     ) {
-      const candidateExpandsTypes = oldTypes === null
-        ? false
-        : newTypes === null
-          ? true
-          : isSubset(oldTypes, newTypes);
-
-      const incompatibleOverlap =
+      const oldTypesAreSubset =
         oldTypes !== null &&
         newTypes !== null &&
-        !isSubset(oldTypes, newTypes) &&
-        !isSubset(newTypes, oldTypes);
+        isTypeSubset(oldTypes, newTypes);
 
-      if (incompatibleOverlap) {
+      const newTypesAreSubset =
+        oldTypes !== null &&
+        newTypes !== null &&
+        isTypeSubset(newTypes, oldTypes);
+
+      const hasTypeOverlap =
+        oldTypes === null ||
+        newTypes === null ||
+        typeSetsOverlap(oldTypes, newTypes);
+
+      const partiallyOverlappingTypes =
+        oldTypes !== null &&
+        newTypes !== null &&
+        hasTypeOverlap &&
+        !oldTypesAreSubset &&
+        !newTypesAreSubset;
+
+      if (partiallyOverlappingTypes) {
         addWarning(
           `${changeField}.type`,
           "The candidate type sets overlap without a clear compatibility relationship."
         );
       } else {
-        const breaking = direction === "request"
-          ? !candidateExpandsTypes
-          : candidateExpandsTypes;
+        const candidateExpandsTypes = oldTypes === null
+          ? false
+          : newTypes === null
+            ? true
+            : oldTypesAreSubset;
+
+        // A completely disjoint replacement cannot preserve compatibility
+        // in either direction: no previously valid value remains valid.
+        const breaking = !hasTypeOverlap || (
+          direction === "request"
+            ? !candidateExpandsTypes
+            : candidateExpandsTypes
+        );
 
         addChange(
           "SCHEMA_TYPE_CHANGED",

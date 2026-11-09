@@ -11,7 +11,7 @@ import createCompatibilityAnalysis from
 
 import AppError from "../utils/appError.js";
 
-const ANALYZER_VERSION = "2.0.0";
+const ANALYZER_VERSION = "2.0.1";
 const DEFAULT_REPORT_LIMIT = 20;
 const MAX_REPORT_LIMIT = 50;
 

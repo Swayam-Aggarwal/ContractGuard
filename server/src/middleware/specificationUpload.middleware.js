@@ -152,6 +152,7 @@ const uploadSpecificationFile = (req, res, next) => {
       try {
         sourceText = new TextDecoder("utf-8", {
           fatal: true,
+          ignoreBOM: true,
         }).decode(req.file.buffer);
       } catch {
         return next(
@@ -167,6 +168,7 @@ const uploadSpecificationFile = (req, res, next) => {
 
       req.specificationUpload = {
         sourceText,
+        sourceBuffer: Buffer.from(req.file.buffer),
         sourceFormat: SUPPORTED_EXTENSIONS.get(extension),
       };
 

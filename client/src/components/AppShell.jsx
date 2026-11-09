@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 
 import {
@@ -28,9 +29,25 @@ const AppShell = () => {
 
   const [logoutError, setLogoutError] = useState("");
 
-  const isProjectDetail = /^\/projects\/[^/]+/.test(
-    location.pathname
-  );
+  const pathname = location.pathname;
+
+  const isExplorer = pathname.endsWith("/explorer");
+
+  const isDiffReport = pathname.includes("/diff-reports/");
+
+  const isComparisons = pathname.endsWith("/comparisons");
+
+  const isProjectDetail = /^\/projects\/[^/]+/.test(pathname);
+
+  const currentPage = isDiffReport
+    ? "Comparison report"
+    : isComparisons
+      ? "Comparisons"
+      : isExplorer
+        ? "API Explorer"
+        : isProjectDetail
+          ? "Project overview"
+          : "Projects";
 
   const handleLogout = async () => {
     setLogoutError("");
@@ -56,6 +73,7 @@ const AppShell = () => {
 
           <div className="brand-copy">
             <span className="brand-name">ContractGuard</span>
+
             <span className="brand-subtitle">
               API WORKBENCH
             </span>
@@ -66,7 +84,10 @@ const AppShell = () => {
           WORKSPACE
         </div>
 
-        <nav className="sidebar-navigation" aria-label="Main navigation">
+        <nav
+          className="sidebar-navigation"
+          aria-label="Main navigation"
+        >
           <NavLink
             to="/projects"
             end
@@ -125,10 +146,25 @@ const AppShell = () => {
         <header className="topbar">
           <div className="breadcrumbs">
             <span>Workspace</span>
+
             <span className="breadcrumb-divider">/</span>
 
+            {isExplorer && (
+              <>
+                <span>Project</span>
+                <span className="breadcrumb-divider">/</span>
+              </>
+            )}
+
+            {(isComparisons || isDiffReport) && (
+              <>
+                <span>Project</span>
+                <span className="breadcrumb-divider">/</span>
+              </>
+            )}
+
             <span className="breadcrumb-current">
-              {isProjectDetail ? "Project overview" : "Projects"}
+              {currentPage}
             </span>
           </div>
 
