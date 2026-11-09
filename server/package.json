@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@scalar/openapi-parser": "0.29.20",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.3.0",
@@ -19,6 +20,8 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.12.0",
+    "multer": "2.5.0",
+    "yaml": "2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

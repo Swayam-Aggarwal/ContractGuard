@@ -1,3 +1,4 @@
+﻿
 import express from "express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -5,8 +6,11 @@ import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.routes.js";
 import createAuthRouter from "./routes/auth.routes.js";
 import createProjectRouter from "./routes/project.routes.js";
+import createSpecVersionRouter from "./routes/specVersion.routes.js";
 
+import createCorsMiddleware from "./middleware/cors.middleware.js";
 import createOriginMiddleware from "./middleware/origin.middleware.js";
+
 import notFound from "./middleware/notFound.middleware.js";
 import errorHandler from "./middleware/error.middleware.js";
 
@@ -31,6 +35,10 @@ const createApp = (config) => {
     )
   );
 
+  // CORS must run before body parsing and Origin validation
+  // so valid browser preflight requests can complete.
+  app.use(createCorsMiddleware(config.APP_ORIGIN));
+
   // Parse incoming JSON with a 16 KB limit.
   app.use(express.json({ limit: "16kb" }));
 
@@ -44,6 +52,7 @@ const createApp = (config) => {
   app.use("/api/v1/health", healthRouter);
   app.use("/api/v1/auth", createAuthRouter(config));
   app.use("/api/v1/projects", createProjectRouter(config));
+  app.use("/api/v1/specifications", createSpecVersionRouter(config));
 
   // Unknown routes.
   app.use(notFound);

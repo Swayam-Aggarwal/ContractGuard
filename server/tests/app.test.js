@@ -1,11 +1,14 @@
+
 import { describe, expect, it } from "vitest";
 import request from "supertest";
 
 import createApp from "../src/app.js";
 
+const APP_ORIGIN = "http://localhost:5173";
+
 const app = createApp({
   NODE_ENV: "test",
-  APP_ORIGIN: "http://localhost:5173",
+  APP_ORIGIN,
   JWT_SECRET: "A".repeat(64),
   JWT_EXPIRES_IN: "30m",
 });
@@ -28,6 +31,68 @@ describe("GET /api/v1/health", () => {
     expect(
       response.headers["x-content-type-options"]
     ).toBe("nosniff");
+  });
+});
+
+describe("CORS", () => {
+  it("should allow the configured frontend origin", async () => {
+    const response = await request(app)
+      .get("/api/v1/health")
+      .set("Origin", APP_ORIGIN)
+      .expect(200);
+
+    expect(
+      response.headers["access-control-allow-origin"]
+    ).toBe(APP_ORIGIN);
+
+    expect(
+      response.headers["access-control-allow-credentials"]
+    ).toBe("true");
+  });
+
+  it("should complete a valid browser preflight request", async () => {
+    const response = await request(app)
+      .options("/api/v1/projects")
+      .set("Origin", APP_ORIGIN)
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "content-type")
+      .expect(204);
+
+    expect(
+      response.headers["access-control-allow-origin"]
+    ).toBe(APP_ORIGIN);
+
+    expect(
+      response.headers["access-control-allow-credentials"]
+    ).toBe("true");
+
+    expect(
+      response.headers["access-control-allow-methods"]
+    ).toContain("POST");
+
+    expect(
+      response.headers["access-control-allow-headers"]
+    ).toContain("Content-Type");
+  });
+
+  it("should not grant CORS access to an unconfigured origin", async () => {
+    const response = await request(app)
+      .get("/api/v1/health")
+      .set("Origin", "https://untrusted.example")
+      .expect(200);
+
+    expect(
+      response.headers["access-control-allow-origin"]
+    ).toBeUndefined();
+  });
+
+  it("should reject preflight requests containing unapproved headers", async () => {
+    await request(app)
+      .options("/api/v1/projects")
+      .set("Origin", APP_ORIGIN)
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "x-unknown-header")
+      .expect(400);
   });
 });
 
@@ -68,7 +133,7 @@ describe("Authentication routes", () => {
   it("should reject invalid login request data", async () => {
     const response = await request(app)
       .post("/api/v1/auth/login")
-      .set("Origin", "http://localhost:5173")
+      .set("Origin", APP_ORIGIN)
       .send({})
       .expect(400);
 
@@ -82,7 +147,7 @@ describe("Malformed JSON requests", () => {
   it("should return a standardized error response", async () => {
     const response = await request(app)
       .post("/api/v1/auth/login")
-      .set("Origin", "http://localhost:5173")
+      .set("Origin", APP_ORIGIN)
       .set("Content-Type", "application/json")
       .send("{invalid-json")
       .expect(400);
