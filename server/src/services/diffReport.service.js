@@ -1,12 +1,16 @@
+
 import mongoose from "mongoose";
 import { createHash } from "node:crypto";
 
 import Project from "../models/project.model.js";
 import SpecVersion from "../models/specVersion.model.js";
 import DiffReport from "../models/diffReport.model.js";
+import TestCase from "../models/testCase.model.js";
 
 import createCompatibilityAnalysis from
   "./compatibility-analysis.service.js";
+import addReferenceImpact from "./reference-impact.service.js";
+import addTestCoverage from "./traceability.service.js";
 
 import AppError from "../utils/appError.js";
 
@@ -191,6 +195,21 @@ const toPublicReport = (report) => {
   };
 };
 
+const addLiveTestCoverage = async (report) => {
+  const testCases = await TestCase.find({
+    projectId: report.projectId,
+    specVersionId: report.baselineVersionId,
+    status: { $in: ["DRAFT", "APPROVED"] },
+  })
+    .select("_id operationKey operationPath title source status")
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(500)
+    .lean()
+    .exec();
+
+  return addTestCoverage(report, testCases);
+};
+
 const toPublicReportSummary = (report) => {
   return {
     id: report._id.toString(),
@@ -316,13 +335,19 @@ const createDiffReport = async (
     .exec();
 
   if (existing) {
+    const publicReport = addReferenceImpact(
+      toPublicReport(existing),
+      baseline.document,
+      candidate.document
+    );
+
     return {
-      report: toPublicReport(existing),
+      report: await addLiveTestCoverage(publicReport),
       reused: true,
     };
   }
 
-  const analysis = createCompatibilityAnalysis(
+  const compatibilityAnalysis = createCompatibilityAnalysis(
     baseline.document,
     candidate.document,
     {
@@ -331,6 +356,12 @@ const createDiffReport = async (
       baselineExplorerWarnings: baseline.explorerWarnings ?? [],
       candidateExplorerWarnings: candidate.explorerWarnings ?? [],
     }
+  );
+
+  const analysis = addReferenceImpact(
+    compatibilityAnalysis,
+    baseline.document,
+    candidate.document
   );
 
   if (getReportPayloadSize(analysis) > MAX_REPORT_SIZE_BYTES) {
@@ -363,7 +394,7 @@ const createDiffReport = async (
     });
 
     return {
-      report: toPublicReport(created),
+      report: await addLiveTestCoverage(toPublicReport(created)),
       reused: false,
     };
   } catch (error) {
@@ -376,8 +407,14 @@ const createDiffReport = async (
         .exec();
 
       if (existingReport) {
+        const publicReport = addReferenceImpact(
+          toPublicReport(existingReport),
+          baseline.document,
+          candidate.document
+        );
+
         return {
-          report: toPublicReport(existingReport),
+          report: await addLiveTestCoverage(publicReport),
           reused: true,
         };
       }
@@ -446,7 +483,57 @@ const getDiffReport = async (
     throw createNotFoundError();
   }
 
-  return toPublicReport(report);
+  // Older reports may only contain the legacy SpecVersion ID fields.
+  // Resolve both shapes before loading documents so historical reports remain readable.
+  const baselineVersionId = (
+    report.baselineVersionId ?? report.baselineSpecVersionId
+  );
+  const candidateVersionId = (
+    report.candidateVersionId ?? report.candidateSpecVersionId
+  );
+
+  if (
+    !isValidObjectId(baselineVersionId) ||
+    !isValidObjectId(candidateVersionId)
+  ) {
+    throw createNotFoundError();
+  }
+
+  const baselineId = normalizeObjectId(baselineVersionId);
+  const candidateId = normalizeObjectId(candidateVersionId);
+
+  const versions = await SpecVersion.find({
+    _id: {
+      $in: [baselineId, candidateId],
+    },
+    projectId: report.projectId,
+  })
+    .select("_id document")
+    .lean()
+    .exec();
+
+  if (versions.length !== 2) {
+    throw createNotFoundError();
+  }
+
+  const baseline = versions.find((version) =>
+    version._id.equals(baselineId)
+  );
+  const candidate = versions.find((version) =>
+    version._id.equals(candidateId)
+  );
+
+  if (!baseline || !candidate) {
+    throw createNotFoundError();
+  }
+
+  const publicReport = addReferenceImpact(
+    toPublicReport(report),
+    baseline.document,
+    candidate.document
+  );
+
+  return addLiveTestCoverage(publicReport);
 };
 
 const diffReportService = {

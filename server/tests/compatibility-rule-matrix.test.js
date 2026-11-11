@@ -72,7 +72,7 @@ const rules = [
 ];
 
 const rulesDocument = readFileSync(
-  new URL("../docs/Rules.md", import.meta.url),
+  new URL("../../docs/Rules.md", import.meta.url),
   "utf8"
 );
 

@@ -1,1045 +1,383 @@
+# Product Design and UI Specification
 
-# Product Design and UI/UX Specification
+**Product:** ContractGuard
+**Version:** 1.1
+**Design Direction:** Precision Workbench
 
-**Product:** ContractGuard  
-**Document version:** 1.1  
-**Design direction:** Precision Workbench  
-**Status:** Revised design baseline  
-**Related documents:** PRD.md, AppFlow.md, Architecture.md, API.md
+## 1. Design Objective
 
-## 1. Design vision
+ContractGuard is a developer workbench. Its interface must communicate precision, traceability, and confidence without looking like a generic admin template.
 
-ContractGuard is a developer-facing API compatibility and regression-testing workbench.
+The primary interface is a technical comparison workspace, not a dashboard made from interchangeable statistic cards.
 
-Its interface should communicate precision, clarity, reliability, and technical depth.
+The visual language should emphasize clear hierarchy, aligned data, restrained colors, strong typography, and high information density without compromising readability.
 
-The product should feel like a focused engineering tool where developers inspect API contracts, understand structural changes, trace their impact, and examine test evidence.
+## 2. Design Principles
 
-The design must prioritize the information required to make technical decisions over decorative elements.
+1. **Evidence before decoration:** Prioritize changed paths, old and new values, rule IDs, and explanations.
+2. **One primary action per view:** Each screen should have one visually dominant action.
+3. **Progressive disclosure:** Advanced technical details should be accessible without overwhelming the default view.
+4. **Accurate status representation:** `POTENTIALLY_BREAKING` and `PARTIAL` must never appear as confirmed safe results.
+5. **Consistent terminology:** UI labels must follow the terminology used in the API and compatibility documentation.
+6. **Accessibility:** All primary functions must support keyboard navigation. Color must never be the only status indicator.
 
-**Core design principle: Make complex API changes easier to understand without hiding the underlying technical evidence.**
+## 3. Visual Identity
 
-## 2. Design principles
+### 3.1 Precision Workbench
 
-### 2.1 Precision over decoration
+- Neutral light workspace.
+- Deep graphite navigation rail.
+- Indigo primary interaction accent.
+- Muted surfaces and thin borders.
+- Semantic colors reserved for statuses and feedback.
+- Monospaced typography for code and schema values.
+- No unnecessary gradients, glassmorphism, oversized hero sections, or decorative charts.
 
-Use technical tables, structured information, meaningful labels, and clear hierarchy.
+### 3.2 Design Tokens
 
-Avoid visual elements that do not help users understand or act on API data.
+Use CSS custom properties to maintain consistent styling.
 
-### 2.2 Information density with clarity
-
-Developers should be able to inspect a meaningful amount of technical information without constantly navigating between pages.
-
-However, density must not come at the expense of readability, spacing, or clear grouping.
-
-### 2.3 Evidence over unsupported claims
-
-Every compatibility finding should provide access to its rule, source location, affected operation, and rationale.
-
-A classification badge alone is insufficient.
-
-### 2.4 Consistent interaction
-
-Similar operations should look and behave consistently throughout the application.
-
-Examples:
-
-- Project creation should use a consistent form pattern.
-- Upload feedback should use the same notification system.
-- Compatibility classifications should use consistent semantic colors.
-- Test results should use the same result vocabulary everywhere.
-
-### 2.5 Honest system states
-
-The interface must distinguish:
-
-- Complete analysis.
-- Partial analysis.
-- Failed analysis.
-- Test coverage.
-- Successful regression.
-- Failed regression.
-- Unsupported execution.
-
-A partially analyzed API must never look completely compatible simply because no breaking change was detected in the supported subset.
-
-### 2.6 Technical information remains accessible
-
-Advanced information may be progressively disclosed, but it should never be discarded or made inaccessible.
-
-Developers must be able to inspect the original relevant JSON values, source locations, and validation diagnostics.
-
-## 3. Visual identity
-
-### 3.1 Design system name
-
-**Precision Workbench**
-
-### 3.2 Overall aesthetic
-
-The interface uses:
-
-- Neutral light workspace backgrounds.
-- Deep graphite navigation surfaces.
-- Restrained indigo as the primary interaction accent.
-- Clear red, amber, green, and slate semantic states.
-- Subtle borders and carefully controlled shadows.
-- Technical typography for code, identifiers, paths, and JSON.
-- Clean typography for normal application text.
-- Structured layouts rather than decorative cards.
-
-### 3.3 Avoid
-
-Do not use:
-
-- Excessive gradients.
-- Glassmorphism.
-- Neon effects.
-- Large decorative illustrations.
-- Overly rounded cards.
-- Generic dashboard layouts dominated by oversized KPI cards.
-- Excessive badges.
-- Excessive animations.
-- Decorative charts without a meaningful data requirement.
-- Different visual treatments for the same semantic status.
-
-The interface should look like a purpose-built developer product.
-
-## 4. Color system
-
-Use centralized semantic design tokens.
-
-The following palette defines the initial direction. Exact shades may be adjusted during visual implementation after checking contrast.
-
-### 4.1 Core colors
-
-| Token | Initial value | Usage |
+| Token | Value | Usage |
 |---|---|---|
-| `canvas` | `#F7F8FA` | Main application background |
-| `surface` | `#FFFFFF` | Primary workspace surfaces |
-| `surface-subtle` | `#F1F3F6` | Secondary sections and panels |
-| `surface-hover` | `#E9EDF3` | Hovered rows and interactive surfaces |
-| `border` | `#DCE1E8` | Standard borders and dividers |
-| `border-strong` | `#C4CCD7` | Emphasized borders |
-| `text-primary` | `#202633` | Main text |
-| `text-secondary` | `#667085` | Supporting text |
-| `text-muted` | `#8992A2` | Non-primary metadata |
-| `navigation` | `#202633` | Graphite navigation rail |
-| `navigation-hover` | `#303A4B` | Navigation hover |
-| `accent` | `#4F46E5` | Primary actions and selected navigation |
-| `accent-hover` | `#4338CA` | Primary interaction hover |
-
-### 4.2 Semantic status colors
+| `--cg-shell` | `#151922` | Sidebar and application chrome |
+| `--cg-shell-muted` | `#202633` | Sidebar hover and active states |
+| `--cg-canvas` | `#F5F7FA` | Main application background |
+| `--cg-surface` | `#FFFFFF` | Panels and menus |
+| `--cg-surface-subtle` | `#F8FAFC` | Secondary panel backgrounds |
+| `--cg-border` | `#E2E8F0` | Dividers and outlines |
+| `--cg-text` | `#172033` | Primary text |
+| `--cg-text-muted` | `#64748B` | Secondary text |
+| `--cg-primary` | `#4F46E5` | Primary actions and selected navigation |
+| `--cg-danger` | `#C2414B` | Breaking changes and errors |
+| `--cg-warning` | `#B7791F` | Potentially breaking changes and warnings |
+| `--cg-success` | `#16805D` | Successful outcomes and non-breaking changes |
+| `--cg-info` | `#2563EB` | Informational states |
 
-| Status | Suggested foreground | Suggested background | Meaning |
-|---|---|---|---|
-| Breaking | `#B42318` | `#FEE4E2` | Confirmed breaking finding |
-| Potentially breaking | `#B54708` | `#FEF0C7` | Possible consumer impact |
-| Non-breaking | `#067647` | `#D1FADF` | Supported compatibility result |
-| Informational | `#475467` | `#EAECF0` | Metadata or documentation change |
-| Unsupported | `#6941C6` | `#F4EBFF` | Construct outside supported analysis |
-| Partial | `#B54708` | `#FEF0C7` | Incomplete analysis or execution |
-| Failed | `#B42318` | `#FEE4E2` | Analysis, assertion, or execution failure |
-| Passed | `#067647` | `#D1FADF` | Successful execution |
-| Running | `#3538CD` | `#E0EAFF` | Active execution |
-| Queued | `#475467` | `#EAECF0` | Waiting for execution |
-| Interrupted | `#667085` | `#F2F4F7` | Execution stopped before completion |
+Semantic colors must always be accompanied by text labels or icons. Verify foreground and background contrast before release.
 
-Colors must never be the only means of communicating meaning.
+### 3.3 Typography
 
-Every classification and result must also have visible text.
+- Primary interface: Inter with a system sans-serif fallback.
+- Technical content: `ui-monospace`, SFMono-Regular, Consolas, monospace.
+- Page titles: 24–28 px, semibold.
+- Section titles: 15–18 px, semibold.
+- Body text: 14 px.
+- Metadata: 12–13 px.
+- Code: 12–13 px with comfortable line height.
 
-### 4.3 Color implementation rules
+Avoid decorative typefaces. Long technical values must wrap appropriately or provide copy controls.
 
-- Define colors as reusable tokens.
-- Use semantic colors consistently.
-- Keep neutral information neutral.
-- Avoid coloring entire panels when a small status indicator is sufficient.
-- Check text and component contrast.
-- Do not use red and green as the only distinction between states.
-- Test all status colors against their backgrounds.
+### 3.4 Spacing and Shape
 
-## 5. Typography
+Use a 4 px base spacing scale.
 
-Use a clear, professional typography hierarchy.
+Common spacing values:
 
-Suggested font roles:
+- 8 px
+- 12 px
+- 16 px
+- 20 px
+- 24 px
+- 32 px
 
-| Role | Suggested font | Usage |
-|---|---|---|
-| Interface | Inter or a comparable sans-serif | Normal application text |
-| Technical/code | JetBrains Mono or a comparable monospace | JSON, paths, identifiers, code |
-| Fallback | System sans-serif and monospace stacks | Reliable rendering |
+Panels should use 8–12 px corner radii. Buttons and inputs should use 6–8 px radii.
 
-Font files should not be bundled unnecessarily.
+Prefer subtle borders over heavy shadows. Reserve shadows for overlays, menus, and elevated elements.
 
-### 5.1 Text hierarchy
+## 4. Application Shell
 
-| Element | Relative emphasis |
-|---|---|
-| Application page title | Highest |
-| Section heading | High |
-| Panel title | Medium-high |
-| Body text | Normal |
-| Table metadata | Secondary |
-| Supporting descriptions | Secondary |
-| Technical identifiers | Monospace |
+### 4.1 Desktop Layout
 
-Avoid oversized headings.
+The desktop interface is the primary experience.
 
-Most application screens should prioritize their working content rather than large introductory titles.
+- Sidebar: approximately 232–248 px fixed width.
+- Main workspace: flexible width.
+- Top bar: breadcrumb, project context, current version, and account menu.
+- Main content: consistent horizontal spacing.
+- Forms and onboarding screens may use a narrower maximum content width.
 
-### 5.2 Technical text
+### 4.2 Sidebar Navigation
 
-Use monospace for:
+Navigation should expose only implemented functionality.
 
-- HTTP methods.
-- API paths.
-- JSON keys.
-- JSON Pointer values.
-- Schema types.
-- Rule IDs.
-- Test identifiers.
-- Version hashes.
-- Request and response examples.
+The intended primary navigation includes:
 
-Long values should wrap, truncate with an accessible full-value reveal, or be displayed in a horizontally scrollable code region where appropriate.
+- Projects
+- API Explorer
+- Comparisons
+- Test Cases
 
-## 6. Layout system
+Test Runs and AI-related navigation should appear only after their respective features are implemented.
 
-### 6.1 Global application shell
+Project-specific navigation may be displayed contextually. Account settings and user actions belong near the bottom of the sidebar.
 
-The authenticated application uses three main layout regions:
+## 5. Screen Specifications
 
-1. Navigation rail/sidebar.
-2. Main content area.
-3. Contextual detail area when a screen requires it.
+### 5.1 Projects Home
 
-The layout should remain consistent across projects, specifications, comparisons, and test results.
+**Purpose:** Help users create projects and resume previous work.
 
-### 6.2 Navigation
+Required elements:
 
-The primary navigation uses a deep graphite background.
+- Product heading and concise description.
+- Primary `New project` action.
+- Recent projects table.
+- Project name and latest specification version.
+- Last activity and available status information.
+- Empty state explaining how to create the first project.
 
-It contains:
+Avoid oversized welcome banners and meaningless KPI cards.
 
-- ContractGuard wordmark.
-- Projects navigation.
-- Current project context.
-- Relevant feature navigation.
-- Account and logout actions.
+### 5.2 Project Overview
 
-Navigation should be compact and consistent.
-
-Selected navigation uses a restrained indigo accent and an obvious selected state.
-
-### 6.3 Main content
-
-The workspace uses a neutral background and white or near-white working surfaces.
-
-Use:
-
-- Consistent page padding.
-- Clearly separated sections.
-- Aligned headings and content boundaries.
-- Predictable table layouts.
-- Consistent vertical rhythm.
-
-Avoid unnecessary nested containers.
-
-### 6.4 Panel treatment
-
-Use subtle borders to distinguish functional areas.
-
-Cards or panels should group meaningful information, not decorate every field.
-
-Use shadows sparingly.
-
-Do not place every table row or every metadata item into its own card.
-
-## 7. Signature screen: API comparison workspace
-
-This is the most important visual component of ContractGuard.
-
-It should receive the greatest design and implementation attention.
-
-### 7.1 Primary layout
-
-The default desktop layout uses three coordinated panels:
-
-```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│ Navigation │ Comparison Header                                             │
-│            │ Baseline: v1         Candidate: v2      Analysis: COMPLETE     │
-│            ├───────────────────┬───────────────────┬───────────────────────┤
-│            │                   │                   │                       │
-│            │ Version / Schema  │ Change List       │ Change Details        │
-│            │ Context           │                   │                       │
-│            │                   │                   │                       │
-│            │ Baseline /        │ BREAKING          │ Rule: RES-002         │
-│            │ Candidate         │ POTENTIALLY ...   │                       │
-│            │                   │ NON-BREAKING      │ Rationale             │
-│            │                   │                   │ Source JSON Pointer   │
-│            │                   │                   │                       │
-│            │                   │                   │ Affected Operations   │
-│            │                   │                   │                       │
-│            │                   │                   │ Linked Test Cases     │
-│            │                   │                   │                       │
-└────────────┴───────────────────┴───────────────────┴───────────────────────┘
-```
-
-The left panel provides version and source context.
-
-The center panel displays detected changes and filters.
-
-The right panel explains the selected change and its test impact.
-
-### 7.2 Comparison header
-
-The header displays:
-
-- Project name.
-- Baseline version label.
-- Candidate version label.
-- Comparison direction.
-- Ruleset version.
-- Overall analysis status.
-- Comparison timestamp.
-
-The comparison direction must be explicit:
-
-`Baseline consumer → Candidate provider`
-
-Do not assume that users will infer direction from version labels.
-
-### 7.3 Left panel: version and schema context
-
-The panel provides relevant baseline and candidate context.
-
-Possible content:
-
-- API path tree.
-- HTTP method indicators.
-- Operation hierarchy.
-- Relevant schema information.
-- Source document location.
-- Baseline/candidate value selection.
-
-The selected item should remain synchronized with the selected change where possible.
-
-The interface must not attempt to display the entire OpenAPI document at once.
-
-Use progressive disclosure for detailed schema content.
-
-### 7.4 Center panel: change list
-
-Each change row displays:
-
-- Classification.
-- Short summary.
-- HTTP method and path where relevant.
-- Rule identifier.
-- Affected-operation indicator where appropriate.
-
-Users can filter by:
-
-- Classification.
-- HTTP method.
-- API path.
-- Text search.
-
-The selected row must have a clear active state.
-
-The list should support keyboard selection and predictable row navigation.
-
-Do not show long rationales inside the change list. Detailed explanations belong in the right panel.
-
-### 7.5 Right panel: change detail
-
-The detail panel displays:
-
-**Classification**
-
-Breaking, potentially breaking, non-breaking, informational, or unsupported.
-
-**Rule information**
-
-- Rule ID.
-- Rule description.
-- Classification rationale.
-
-**Location**
-
-- JSON Pointer.
-- Original source location where available.
-
-**Value comparison**
-
-Baseline and candidate values should be shown side by side where meaningful.
-
-Example:
-
-```json
-// Baseline
-{
-  "price": 99.5
-}
-```
-
-```json
-// Candidate
-{
-  "price": "99.50"
-}
-```
-
-**Affected operations**
-
-Display the operations impacted by the finding.
-
-For shared-schema changes, indicate that the finding affects multiple operations.
-
-**Test coverage**
-
-Display:
-
-- Number of linked test cases.
-- Approved count.
-- Draft count.
-- Coverage status.
-- Available test-case navigation.
-
-**Regression evidence**
-
-When test runs exist, show their relationship to the comparison and the relevant test cases.
-
-The interface must distinguish coverage from an actual passing regression run.
-
-### 7.6 Width and resizing
-
-The three-panel arrangement should use adjustable proportions on desktop.
-
-Initial design proportions may use:
-
-- Left panel: approximately 24%.
-- Center panel: approximately 32%.
-- Right panel: approximately 44%.
-
-These are starting points, not fixed pixel requirements.
-
-Minimum panel widths must preserve usability.
-
-If the viewport cannot support three readable panels, collapse the layout into selectable tabs or a stacked view.
-
-Avoid creating horizontal scrolling across the entire page.
-
-### 7.7 Important interaction behavior
-
-- Selecting a change updates its detail panel.
-- Selecting an affected operation opens its relevant operation context.
-- Selecting a linked test case opens the test-case detail.
-- Returning to the comparison should preserve the selected change when practical.
-- Unsupported details remain accessible and visually distinguishable.
-- Long JSON content can be expanded without breaking the overall layout.
-
-## 8. Screen specifications
-
-### 8.1 Login
-
-Purpose: Authenticate an existing user.
-
-Content:
-
-- ContractGuard identity.
-- Email.
-- Password.
-- Login action.
-- Registration link.
-- Inline validation and authentication feedback.
-
-Keep the layout focused and uncluttered.
-
-### 8.2 Registration
-
-Purpose: Create a user account.
-
-Content:
-
-- Display name, optional.
-- Email.
-- Password.
-- Registration action.
-- Login navigation.
-- Password requirement guidance.
-
-### 8.3 Projects workspace
-
-Purpose: Provide an overview of the user's projects.
-
-Content:
-
-- Page title.
-- Create-project action.
-- Project list or compact table.
-- Project name.
-- Description.
-- Specification count.
-- Last activity.
-- Relevant recent comparison status.
-
-Avoid filling the page with oversized KPI cards.
-
-The primary task is opening or creating a project.
-
-### 8.4 Project overview
-
-Purpose: Show the current project's working context.
-
-Content:
+Required elements:
 
 - Project name and description.
-- Specification version list.
-- Recent comparisons.
-- Recent test runs.
-- Upload action.
-- Compare action.
+- Available specification versions.
+- Baseline and candidate version selection.
+- Recent comparison reports.
+- Actions to upload a specification and compare versions.
+- Warnings when an analysis is partial or incomplete.
 
-Empty projects should make the first upload action obvious.
+The page should help users understand the current project state without duplicating detailed comparison findings.
 
-### 8.5 Specification upload
+### 5.3 API Explorer
 
-Purpose: Import and validate an OpenAPI file.
+The API Explorer should provide three levels of information:
 
-Content:
-
-- File selection or drag-and-drop region.
-- Supported file formats.
-- Maximum size.
-- Version label input.
-- Upload action.
-- Upload progress.
-- Validation feedback.
-
-Do not automatically upload a file merely because it was dragged into the interface; provide an explicit submission step.
-
-### 8.6 Specification detail
-
-Purpose: Inspect one immutable API version.
-
-Content:
-
-- Version label.
-- OpenAPI version.
-- Source format.
-- Upload date.
-- Operation count.
-- Parse status.
-- Supported-feature warnings.
-- Runner eligibility.
-- Explore action.
-- Compare action.
-
-Do not make runner eligibility look like full API validity. A specification can be valid but not eligible for the bundled runner.
-
-### 8.7 API Explorer
-
-Purpose: Inspect operations and supported schemas.
-
-Suggested layout:
-
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│ API Explorer                                      Specification: v1    │
-├───────────────────┬────────────────────────────────────────────────────┤
-│ Paths             │ Operation Details                                  │
-│                   │                                                    │
-│ GET /products     │ GET /products/{productId}                          │
-│ POST /products    │ Parameters                                         │
-│ GET /orders       │ Request                                            │
-│                   │ Responses                                          │
-│                   │ Schema                                             │
-│                   │ References                                         │
-└───────────────────┴────────────────────────────────────────────────────┘
-```
-
-Use clear HTTP method indicators.
-
-The operation detail area should show request and response definitions in a structured manner.
-
-### 8.8 Comparison creation
-
-Purpose: Select two specification versions.
-
-Content:
-
-- Baseline selector.
-- Candidate selector.
-- Clear description of comparison direction.
-- Selected version summaries.
-- Compare action.
-
-The interface should prevent selecting the same version twice.
-
-### 8.9 Test-case library
-
-Purpose: Manage test cases belonging to specification versions.
-
-Content:
-
-- Test title.
-- Operation.
-- Baseline version.
-- Source: manual or AI.
-- Status: draft, approved, archived.
-- Last updated.
-- Relevant filters.
-
-Do not confuse AI-generated and manually created cases.
-
-### 8.10 Test-case detail
-
-Purpose: Review one test case.
-
-Content:
-
-- Title and description.
-- Baseline specification version.
-- Operation path and method.
-- Path parameters.
-- Query parameters.
-- Explicit assertions.
-- Source.
-- Current approval status.
-- Creation and update information.
-
-Approval must be a clear, deliberate action.
-
-### 8.11 AI suggestion review
-
-Purpose: Review candidate test ideas before they enter the approved test library.
-
-Content:
-
-- Selected synthetic fixture.
-- Selected operation.
-- Provider data-sharing disclosure.
-- Context preview.
-- Explicit consent.
-- Proposed test list.
-- Test title.
-- Rationale.
-- Suggested inputs and assertions.
-- Edit, discard, and approve actions.
-
-Every suggestion is visibly marked as AI-generated and remains a draft until approved.
-
-If the AI feature is disabled, display its availability state without preventing manual test-case creation.
-
-### 8.12 Test-run detail
-
-Purpose: Display execution results and evidence.
-
-Content:
-
-- Run identifier.
-- Associated comparison.
-- Baseline and candidate.
-- Ruleset version.
-- Bundled implementation version.
-- Run status.
-- Test result counts.
-- Selected cases.
-- Individual result rows.
-- HTTP status when available.
-- Execution duration.
-- Validation errors.
-- Bounded evidence.
-
-A result row should support expansion to reveal technical details without making the main results table excessively wide.
-
-### 8.13 Account
-
-Purpose: Display the signed-in account and allow logout.
-
-Do not introduce account-management features beyond the v1 requirements.
-
-## 9. Tables and technical information
-
-Tables are central to ContractGuard.
-
-Use clear column headers, consistent alignment, and visible row hover/selection states.
-
-### 9.1 Change table
-
-Suggested columns:
-
-| Column | Content |
-|---|---|
-| Severity | Classification |
-| Change | Short description |
-| Operation | HTTP method and path |
-| Rule | Rule ID |
-| Coverage | Linked test status |
-
-Avoid showing too many columns at the same time on narrow screens.
-
-### 9.2 Test results table
-
-Suggested columns:
-
-| Column | Content |
-|---|---|
-| Result | Test outcome |
-| Test case | Title |
-| Operation | Method/path |
-| HTTP status | Actual status when available |
-| Duration | Execution time |
-
-Detailed evidence should be available through row expansion or the test detail view.
-
-### 9.3 Technical data presentation
-
-- Use monospace for code and identifiers.
-- Indent JSON consistently.
-- Syntax-highlight only where it improves readability.
-- Avoid overly bright syntax colors.
-- Preserve the ability to inspect raw values.
-- Provide copy controls for useful technical identifiers and paths.
-- Do not expose hidden data or secrets through copy actions.
-
-## 10. Component patterns
-
-Create reusable components for repeated interface behavior.
-
-Suggested component categories:
-
-### Layout
-
-- `AppShell`
-- `Sidebar`
-- `TopBar`
-- `PageContainer`
-- `PageHeader`
-- `Panel`
-
-### Feedback
-
-- `StatusBadge`
-- `Alert`
-- `Toast`
-- `EmptyState`
-- `LoadingState`
-- `ErrorState`
-- `PartialState`
-
-### Technical display
-
-- `MethodBadge`
-- `ApiPath`
-- `JsonViewer`
-- `JsonDiffViewer`
-- `CodeBlock`
-- `RuleReference`
-- `OperationList`
-
-### Comparison
-
-- `ComparisonHeader`
-- `ComparisonSidebar`
-- `ChangeList`
-- `ChangeListItem`
-- `ChangeDetailPanel`
-- `AffectedOperations`
-- `TestCoverageSummary`
-
-### Testing
-
-- `TestCaseTable`
-- `TestCaseEditor`
-- `TestCaseStatus`
-- `TestRunSummary`
-- `TestResultTable`
-- `TestEvidencePanel`
-
-These are proposed component responsibilities, not mandatory file names.
-
-Avoid creating a separate component for every small text label or metadata field.
-
-## 11. Interaction design
-
-### 11.1 Buttons
-
-Use a consistent button hierarchy.
-
-**Primary**
-
-For the main action on a screen:
-
-- Create Project.
-- Upload Specification.
-- Compare Versions.
-- Approve Test.
-- Run Tests.
-
-**Secondary**
-
-For supporting actions:
-
-- Cancel.
-- View Details.
-- Edit.
-- Open Explorer.
-
-**Destructive**
-
-For actions that remove or archive resources where appropriate.
-
-Destructive actions require clear labels and confirmation when the effect is significant.
-
-### 11.2 Tables
-
-- Entire row selection should be available only where it is an obvious interaction.
-- Interactive text and controls should have independent focus behavior.
-- Hover states should not be the only indication that a row is clickable.
-- Selected rows must have a distinct visual indicator.
-- Keyboard navigation must remain possible.
-
-### 11.3 Forms
-
-- Labels must remain visible.
-- Required fields must be identified.
-- Validation should appear near the relevant field.
-- Preserve user input after recoverable errors.
-- Disable repeated submission while the same request is pending.
-- Display clear success and error feedback.
-
-### 11.4 Notifications
-
-Use notifications for concise feedback.
-
-Examples:
-
-- Project created.
-- Upload completed.
-- Test case approved.
-- Run accepted.
-- Unable to save changes.
-
-Do not use notifications as a substitute for persistent error or partial-analysis details.
-
-### 11.5 Destructive actions
-
-Require confirmation for:
-
-- Project deletion.
-- Archiving where the effect is not immediately reversible.
-- Any future permanent deletion action.
-
-Confirmation dialogs must clearly explain the effect.
-
-## 12. Application state design
-
-Every major interface must define its loading, empty, error, and partial states.
-
-### 12.1 Loading state
-
-Use:
-
-- A clear progress indicator.
-- Skeleton content where useful.
-- Disabled repeated submission while a request is active.
-
-Do not show stale results as though a new comparison has completed.
-
-### 12.2 Empty state
-
-Examples:
-
-- No projects.
-- No specification versions.
-- No comparisons.
-- No linked test cases.
-- No test history.
-
-Provide the next useful action and a brief explanation.
-
-### 12.3 Error state
-
-Examples:
-
-- Request validation error.
-- Authentication expiry.
-- Network failure.
-- Upload rejection.
-- Failed comparison.
-- Failed execution.
-
-Show an understandable explanation and a safe recovery path.
-
-### 12.4 Partial state
-
-Partial states deserve particular attention.
-
-Examples:
-
-- Unsupported OpenAPI keywords.
-- Incomplete shared-reference impact.
-- Unsupported response schema.
-- Unsupported runner operation.
-- Interrupted test run.
-
-Always show why the result is partial and what could not be evaluated.
-
-### 12.5 Disabled action
-
-If a button is disabled because of a domain restriction, provide a useful explanation.
-
-Examples:
-
-- Candidate is not a recognized bundled fixture.
-- No approved test cases are available.
-- Comparison has not completed.
-- AI is unavailable.
-- Selected test cases do not belong to the baseline.
-
-Do not leave users guessing why an action is unavailable.
-
-## 13. Responsive behavior
-
-ContractGuard is primarily a desktop developer workbench.
-
-The initial visual target is a desktop browser at approximately 1440px width.
-
-However, the application must remain usable at narrower widths.
-
-### 13.1 Desktop
-
-- Persistent sidebar.
-- Three-panel comparison workspace.
-- Full technical tables.
-- Resizable or adjustable panel proportions.
-- Visible contextual information.
-
-### 13.2 Tablet
-
-- Collapsible navigation.
-- Reduced panel widths.
-- Comparison panels may become tabs.
-- Tables may hide lower-priority columns.
-- Detail content remains accessible.
-
-### 13.3 Mobile
-
-- Compact navigation.
-- Single-column layouts.
-- Comparison panels become selectable sections.
-- Technical tables become stacked or horizontally scrollable within their own container.
-- Forms remain fully usable.
-- Status and validation messages remain visible.
-
-Do not attempt to force the desktop three-column comparison layout onto a mobile screen.
-
-## 14. Accessibility requirements
-
-Target WCAG 2.2 AA-oriented practices.
+1. Operation list grouped by tag or path.
+2. Selected operation summary, including method, path, parameters, request body, and responses.
+3. Expandable schema details, including required and optional properties and source locations.
 
 Requirements:
 
-- Semantic HTML.
-- Proper heading hierarchy.
-- Accessible labels.
-- Keyboard operation for navigation and primary workflows.
+- HTTP methods use consistent visual labels.
+- Search and filtering support keyboard input.
+- Long paths and schema values remain readable.
+- Unsupported constructs are identified clearly.
+- Empty and loading states are provided.
+- Technical details remain accessible without excessive visual density.
+
+### 5.4 Version Comparison Workbench
+
+This is the signature screen of ContractGuard.
+
+The desktop layout uses three primary areas:
+
+**Left panel**
+- Operation and path explorer.
+- Severity filters.
+- Finding navigation.
+
+**Center panel**
+- Compatibility finding list.
+- Selected change details.
+- Side-by-side baseline and candidate values where applicable.
+
+**Right inspector**
+- Finding classification.
+- Rule ID.
+- Explanation and rationale.
+- Source location.
+- Affected operations.
+- Linked test cases and coverage information.
+
+The screen header must display:
+
+- Baseline version.
+- Candidate version.
+- Comparison direction.
+- Overall analysis status.
+
+A summary section may display counts for:
+
+- Breaking.
+- Potentially breaking.
+- Non-breaking.
+- Informational.
+- Unsupported findings.
+
+Each finding must display relevant information:
+
+- Classification.
+- HTTP method and path, where applicable.
+- JSON Pointer or source location.
+- Old and new values.
+- Rule ID.
+- Explanation.
+
+The interface must clearly distinguish `COMPLETE` from `PARTIAL` analysis.
+
+Never display a general green compatibility indicator when unsupported constructs remain.
+
+### 5.5 Test Case Workspace
+
+Required elements:
+
+- Test case title.
+- Source (`MANUAL` or `AI`).
+- Linked API operation.
+- Supported path and query parameters.
+- Expected status and response assertions.
+- Current lifecycle status.
+- Available actions based on the lifecycle state.
+
+Lifecycle labels:
+
+- `DRAFT`
+- `APPROVED`
+- `ARCHIVED`
+
+Draft cases may be edited and reviewed. Approval must be an explicit user action.
+
+AI-generated suggestions, when implemented, must appear as drafts and must never be automatically approved.
+
+### 5.6 Test Run Results
+
+This screen belongs to the planned regression-runner phase.
+
+When implemented, it should display:
+
+- Run status and timestamps.
+- Total, passed, failed, skipped, unsupported, and error counts.
+- Filterable individual result table.
+- Test-case title and linked operation.
+- Expected and actual results.
+- Execution duration.
+- Validation diagnostics.
+- Link to the associated comparison and specification versions.
+
+Do not expose secrets, credentials, or unrestricted response data in result details.
+
+### 5.7 AI Suggestion Review
+
+This screen belongs to the planned AI integration phase.
+
+Required elements:
+
+- Clear notice that AI-generated suggestions may be incorrect.
+- Sanitized preview of the context being sent to the provider.
+- Explicit consent before external submission.
+- Suggested test title and rationale.
+- Suggested operation and input values.
+- Expected assertions.
+- Review, edit, approve, and discard actions.
+- Provider and model information where available.
+
+AI output must never be rendered or treated as executable code.
+
+## 6. Reusable Component Inventory
+
+The following components may be developed when needed:
+
+| Component | Responsibility |
+|---|---|
+| `AppShell` | Main application layout |
+| `Sidebar` | Primary navigation |
+| `Topbar` | Project context and account actions |
+| `Breadcrumbs` | Navigation hierarchy |
+| `PageHeader` | Page title and primary action |
+| `SectionHeader` | Section-level heading |
+| `EmptyState` | Empty data presentation |
+| `StatusBadge` | General status display |
+| `SeverityBadge` | Compatibility severity |
+| `AnalysisStatusBanner` | Complete and partial analysis states |
+| `MethodBadge` | HTTP method display |
+| `CodeBlock` | Formatted technical content |
+| `JsonTree` | Expandable JSON presentation |
+| `OperationTree` | API operation navigation |
+| `OperationDetails` | Selected operation information |
+| `VersionSelector` | Specification version selection |
+| `UploadDropzone` | Specification upload interface |
+| `ChangeList` | Compatibility findings |
+| `ChangeInspector` | Selected finding details |
+| `SchemaValueDiff` | Baseline and candidate schema differences |
+| `TestCaseTable` | Test-case management |
+| `TestRunSummary` | Execution summary |
+| `TestResultRow` | Individual test result |
+| `ConfirmDialog` | Confirmation for destructive actions |
+| `Toast` | Temporary feedback |
+| `InlineError` | Contextual errors |
+| `Skeleton` | Loading placeholders |
+
+Build reusable components when they are shared across screens or require a common interaction and state contract.
+
+Do not create a separate design-system package for this project.
+
+## 7. Interaction Standards
+
+- Primary buttons should use clear action verbs.
+- Examples include `Upload specification`, `Compare versions`, and `Approve test`.
+- Destructive actions require confirmation.
+- Asynchronous actions must display pending states.
+- Duplicate submissions should be prevented where appropriate.
+- Tables must support loading, empty, error, and populated states.
+- Long-running actions must display progress or a clear running status.
+- Copy controls must provide success or failure feedback.
+- Tooltips must supplement accessible labels rather than replace them.
+- Optimistic updates should be limited to suitable reversible interface changes.
+- Persisted compatibility findings must come from the backend.
+
+## 8. Responsive Behavior
+
+**Desktop**
+
+The primary experience supports the complete comparison workbench and its multi-panel layout.
+
+**Tablet**
+
+- Sidebar collapses.
+- The three-panel comparison layout becomes selectable or collapsible panels.
+- Important finding details remain accessible.
+
+**Mobile**
+
+- Project navigation remains accessible.
+- Comparison summaries remain readable.
+- Finding details use a stacked layout.
+- Long technical values must not cause horizontal page overflow.
+- Complex schema comparisons may use vertically stacked sections.
+
+No primary application action should become inaccessible on smaller screens.
+
+## 9. Accessibility Requirements
+
+Target WCAG 2.2 AA principles.
+
+Requirements:
+
+- Semantic headings and landmarks.
+- Keyboard-operable navigation and controls.
 - Visible focus indicators.
-- Appropriate text and component contrast.
-- Accessible status announcements.
-- Descriptive button names.
-- Meaningful error messages.
-- Accessible modal focus behavior.
-- Keyboard-accessible tabs and expandable panels.
-- No reliance on color alone.
-- Reduced-motion support where animation exists.
+- Appropriate focus management in dialogs.
+- Escape-key support where appropriate.
+- Status communicated through text and icons, not color alone.
+- Sufficient text and control contrast.
+- Reduced-motion preferences respected.
+- Form errors connected to their inputs.
+- Accessible announcements for important validation feedback.
+- Readable technical content at increased browser zoom.
 
-Use accessible native controls wherever practical.
+## 10. Design References
 
-For tables, use correct header and data-cell semantics.
+Use these products as references for interaction patterns and information hierarchy, not as templates to copy.
 
-For custom interactive components, implement expected keyboard and screen-reader behavior.
+- Scalar API Reference — API operation navigation and technical reading experience.
+- Postman — Request and response organization.
+- Sentry — Issue severity and technical evidence presentation.
+- shadcn/ui — Accessible component implementation patterns.
+- Lucide — Consistent iconography.
 
-These design requirements do not constitute a claim of formal accessibility certification.
-
-## 15. Motion and animation
-
-Keep motion subtle and functional.
-
-Permitted examples:
-
-- Small panel transitions.
-- Expand/collapse interactions.
-- Loading indicators.
-- Subtle hover transitions.
-- Navigation state transitions.
-
-Avoid:
-
-- Large page-transition animations.
-- Decorative floating effects.
-- Repeated attention-grabbing movement.
-- Animated dashboards without user benefit.
-
-Respect `prefers-reduced-motion`.
-
-## 16. Visual consistency rules
-
-- Use the same spacing scale throughout the application.
-- Use consistent border radii.
-- Use consistent table density.
-- Use semantic status colors consistently.
-- Use consistent HTTP method indicators.
-- Use consistent typography for code.
-- Use the same interaction states for repeated components.
-- Avoid multiple visual styles for the same classification.
-- Keep the comparison workspace visually aligned with the rest of the product.
-- Use iconography consistently and only where it improves recognition.
-
-## 17. Design acceptance criteria
+## 11. Design Acceptance Criteria
 
 The design is accepted when:
 
-1. The application uses the Precision Workbench visual direction.
-2. Navigation is visually consistent across authenticated screens.
-3. The comparison workspace uses the coordinated three-panel desktop layout.
-4. Comparison direction is visible and unambiguous.
-5. Change classifications have consistent semantic treatments.
-6. Each change exposes its rule, rationale, location, and affected operations.
-7. Test coverage is distinguished from regression execution results.
-8. Unsupported and partial states are clearly visible.
-9. Test-run results distinguish failure, unsupported execution, errors, and interruption.
-10. AI-generated test suggestions are visibly identified as drafts.
-11. Forms provide clear validation and submission feedback.
-12. Tables remain readable and usable with keyboard input.
-13. The application adapts to tablet and mobile widths.
-14. Color contrast and visible focus are checked.
-15. Primary interactions work without relying on hover.
-16. There are no decorative UI elements that obscure technical information.
-17. Loading, empty, error, and partial states are implemented on all major workflows.
-18. The design remains usable when AI is disabled.
-
-## 18. Design references
-
-Use these as implementation references, not templates to copy blindly.
-
-- Tailwind CSS documentation:  
-  https://tailwindcss.com/docs
-
-- Lucide icons:  
-  https://lucide.dev/icons/
-
-- WCAG 2.2:  
-  https://www.w3.org/TR/WCAG22/
-
-- WAI-ARIA Authoring Practices Guide:  
-  https://www.w3.org/WAI/ARIA/apg/
-
-- React accessibility guidance:  
-  https://react.dev/learn/accessibility
+1. The comparison screen feels like a professional developer workbench rather than a generic admin dashboard.
+2. Primary workflows have appropriate loading, empty, error, success, and partial-analysis states.
+3. Every severity and analysis status has a clear text label.
+4. Keyboard-only navigation works for all primary workflows.
+5. Desktop, tablet, and mobile layouts remain usable.
+6. Technical tables display meaningful labels and values.
+7. No placeholder metrics or decorative charts are presented as real application data.
+8. Implemented features are visually distinguishable from planned capabilities.
+9. Comparison findings remain understandable without requiring users to inspect raw JSON.

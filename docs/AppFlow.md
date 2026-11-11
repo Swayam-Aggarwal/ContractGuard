@@ -1,820 +1,1157 @@
+# ContractGuard — Application Flow and User Journeys
 
-# Application Flow and User Journeys
+**Document:** Application Flow and User Journeys
+**Version:** 1.2
+**Product:** ContractGuard
+**Status:** Revised implementation baseline
+**Last updated:** 11 November 2026
 
-**Product:** ContractGuard  
-**Document version:** 1.1  
-**Status:** Revised implementation baseline  
-**Related documents:** PRD.md, Design.md, API.md, Schema.md, Architecture.md, SecurityReview.md
+---
 
 ## 1. Purpose
 
-This document describes how users navigate ContractGuard and how the application behaves during its primary workflows.
+This document defines how users interact with ContractGuard, how they navigate between application screens, and how the primary product workflows operate.
 
-It defines:
+It establishes the expected user journeys, application states, navigation structure, validation behavior, and relationships between the frontend and backend.
 
-- User journeys.
-- Application navigation.
-- Screen responsibilities.
-- Specification upload and validation flow.
-- API exploration.
-- Version comparison.
-- Change-to-test traceability.
-- Test-case management.
-- Regression execution.
-- AI-assisted test suggestions.
-- Loading, empty, error, and partial states.
-- Important workflow and authorization constraints.
+The central product workflow is:
 
-The primary product workflow is:
+**Import API Specifications → Explore API Contracts → Compare Versions → Identify Changes → Analyse Impact → Review Test Coverage → Approve Test Cases → Execute Regression Tests → Inspect Evidence.**
 
-**Import API specifications → Compare versions → Understand changes → Identify affected operations and test coverage → Approve tests → Execute regression checks → Review evidence.**
+The application is designed around a single-user project workspace.
 
-## 2. User roles
+Every project and its associated resources belong to an authenticated user. The backend is responsible for authentication, authorization, validation, and all authoritative application state transitions.
 
-V1 has one user role:
+This document distinguishes functionality available in the current implementation from functionality planned for subsequent development phases.
 
-### Authenticated project owner
+---
 
-An authenticated user can:
+## 2. User Roles and Access Model
 
+### 2.1 Authenticated Project Owner
+
+ContractGuard v1 has one primary user role: an authenticated project owner.
+
+The project owner can:
+
+- Register and authenticate.
 - Create and manage personal projects.
-- Upload API specifications.
-- Explore specification versions and operations.
-- Create comparisons.
-- Inspect compatibility findings.
-- View affected operations and linked test cases.
-- Create and approve test cases.
-- Execute eligible regression runs.
-- Review historical comparisons and execution results.
-- Request optional AI-generated test suggestions for eligible synthetic fixtures.
+- Upload OpenAPI specifications.
+- Inspect specification versions.
+- Explore API operations and reusable components.
+- Compare baseline and candidate specifications.
+- Review compatibility findings.
+- Inspect affected operations.
+- Manage baseline-version test cases.
+- Review test coverage.
+- Approve and archive test cases.
+- Access historical comparison reports.
 
-There are no organization administrators, team members, reviewers, or billing roles in v1.
+Future execution capabilities will allow the owner to run eligible approved test cases against a controlled bundled implementation.
 
-Every project and its child resources belong to exactly one user.
+### 2.2 Access Boundaries
 
-## 3. Application navigation
+Every project-owned resource must be associated with its parent project.
 
-### 3.1 Public routes
+The backend must verify ownership before allowing access to:
 
-```text
-/login
-/register
-```
+- Project records.
+- Specification versions.
+- Comparison reports.
+- Test cases.
+- Future test-run records.
 
-Public routes provide account access.
+The frontend may hide unavailable actions or protect navigation routes, but these measures do not replace backend authorization.
 
-### 3.2 Authenticated application routes
+### 2.3 Out-of-Scope Roles
 
-```text
-/app
-/app/projects
-/app/projects/:projectId
+The following are not part of v1:
 
-/app/projects/:projectId/specifications
-/app/specifications/:specVersionId
-/app/specifications/:specVersionId/explorer
+- Organization administrators.
+- Team members.
+- Workspace reviewers.
+- Billing administrators.
+- External API consumers.
+- Multi-tenant organization managers.
 
-/app/projects/:projectId/comparisons
-/app/comparisons/:comparisonId
+---
 
-/app/comparisons/:comparisonId/tests
-/app/test-cases/:testCaseId
-/app/test-runs/:testRunId
-```
+## 3. Application Navigation
 
-The exact nesting may change during frontend implementation, but the route responsibilities must remain consistent.
+### 3.1 Application Entry Points
 
-### 3.3 Primary navigation
+The primary public routes are:
 
-The authenticated application provides:
+| Route | Purpose | Access |
+|---|---|---|
+| `/` | Redirect to the projects workspace | Public entry |
+| `/login` | User authentication | Public |
+| `/register` | Account registration | Public |
 
-- Projects
-- Current project context
-- API specifications
-- Comparisons
-- Test cases
-- Test runs
-- Account/logout
+Authenticated application routes:
 
-Comparison and test-run navigation should preserve the relevant project and comparison context.
+| Route | Purpose |
+|---|---|
+| `/projects` | Projects workspace |
+| `/projects/:projectId` | Project overview |
+| `/projects/:projectId/specifications/:specVersionId/explorer` | API Explorer |
+| `/projects/:projectId/comparisons` | Comparison workspace |
+| `/projects/:projectId/diff-reports/:reportId` | Comparison report details |
+| `/projects/:projectId/specifications/:specVersionId/test-cases` | Baseline test-case library |
+| `/projects/:projectId/diff-reports/:reportId/coverage` | Comparison test-coverage projection |
 
-### 3.4 Navigation rules
+These routes reflect the current Phase 6 React application routing structure.
 
-- Unauthenticated users attempting protected routes are redirected to login.
-- Authenticated users visiting login or registration may be redirected to the application home.
+### 3.2 Application Shell
+
+Authenticated screens share a common application shell.
+
+The shell contains:
+
+**Sidebar**
+
+- ContractGuard branding.
+- Projects navigation.
+- Context-sensitive Test Cases navigation.
+- Context-sensitive Test Coverage navigation.
+- Authenticated account details.
+- Sign-out action.
+
+**Top navigation bar**
+
+- Workspace breadcrumb.
+- Current page context.
+- Personal workspace indicator.
+
+**Main content area**
+
+Displays the currently selected page through the nested application route.
+
+The application shell should remain consistent across the Projects, Explorer, Comparison, and Test Case workflows.
+
+### 3.3 Navigation Rules
+
+- Unauthenticated users accessing protected routes are redirected to login.
+- Authenticated users accessing login or registration can be redirected to the application workspace.
 - Invalid or inaccessible resource IDs display a safe not-found state.
-- A deleted project cannot be used to create new resources.
-- The backend remains the authority for ownership and permissions.
-- Frontend route protection is a navigation convenience, not an authorization control.
+- Project-specific navigation must preserve the correct project context.
+- Comparison-specific navigation must preserve the comparison identifier.
+- The backend remains authoritative for project and resource ownership.
+- Expired authentication must result in safe session recovery.
 
-## 4. End-to-end user journey
+### 3.4 Navigation Structure
 
 ```mermaid
 flowchart TD
-    Start["Open ContractGuard"]
-    Auth["Register / Login"]
+    Root["ContractGuard"]
+    Auth{"Authenticated?"}
+    Login["Login / Register"]
     Projects["Projects Workspace"]
-    Project["Create or Open Project"]
-    Upload["Upload Baseline and Candidate Specifications"]
-    Validate["Parse and Validate Documents"]
-    Explorer["Explore API Operations"]
-    Compare["Compare Versions"]
-    Changes["Review Compatibility Changes"]
-    Coverage["Inspect Affected Operations and Test Coverage"]
-    Cases["Create / Review / Approve Test Cases"]
-    Eligible{"Candidate is a recognized bundled fixture?"}
-    Run{"Approved test cases available?"}
-    Execute["Execute Bounded Regression Run"]
-    Evidence["Review Results and Evidence"]
-    History["View Comparison and Run History"]
+    Project["Project Overview"]
+    Explorer["API Explorer"]
+    Comparisons["Comparison Workspace"]
+    Report["Comparison Report"]
+    Cases["Test Case Library"]
+    Coverage["Test Coverage"]
 
-    Start --> Auth
-    Auth --> Projects
+    Root --> Auth
+    Auth -->|"No"| Login
+    Auth -->|"Yes"| Projects
+    Login --> Projects
     Projects --> Project
-    Project --> Upload
-    Upload --> Validate
-    Validate --> Explorer
-    Explorer --> Compare
-    Compare --> Changes
-    Changes --> Coverage
+    Project --> Explorer
+    Project --> Comparisons
+    Explorer --> Cases
+    Comparisons --> Report
+    Report --> Coverage
     Coverage --> Cases
-    Cases --> Eligible
-    Eligible -->|"No"| History
-    Eligible -->|"Yes"| Run
-    Run -->|"No"| Cases
-    Run -->|"Yes"| Execute
-    Execute --> Evidence
-    Evidence --> History
 ```
 
-A comparison can be completed even when a candidate is not eligible for the bundled regression runner.
+The regression-run and AI workflows are future capabilities and are intentionally excluded from the currently available route structure.
 
-In that case, the user can still inspect comparison results and coverage, but the execution action is unavailable.
+---
 
-## 5. Authentication flow
+## 4. Authentication Flow
 
-### 5.1 Registration
+### 4.1 Registration
 
-1. User opens `/register`.
-2. User enters email, password, and optional display name.
-3. Frontend performs preliminary form validation.
-4. Frontend submits the request to `POST /api/v1/auth/register`.
-5. Backend validates the input.
-6. Backend checks for duplicate email.
-7. Backend hashes the password using Argon2id.
-8. Backend creates the account.
-9. Successful registration establishes authentication according to the configured cookie flow.
-10. User is redirected to the authenticated application.
+**Route:** `/register`
+
+The registration workflow allows a new user to create a ContractGuard account.
+
+User journey:
+
+1. User opens the registration page.
+2. User enters an email address.
+3. User enters a password.
+4. User optionally provides a display name.
+5. Frontend performs preliminary validation.
+6. User submits the registration form.
+7. Backend validates the request.
+8. Backend checks for an existing account with the same email.
+9. Backend hashes the password using bcrypt.
+10. Backend creates the account.
+11. Backend issues the configured JWT authentication cookie.
+12. Frontend establishes authenticated application state.
+13. User is redirected to the Projects workspace.
 
 Expected outcomes:
 
-- Valid registration: account created.
-- Duplicate email: clear validation feedback.
-- Invalid fields: field-level messages.
-- Server failure: recoverable error message.
+| Scenario | Application behavior |
+|---|---|
+| Valid registration | Account created and authenticated |
+| Duplicate email | Display duplicate-account error |
+| Invalid email | Display validation feedback |
+| Invalid password | Display password validation feedback |
+| Backend failure | Display recoverable error |
 
-Passwords and authentication tokens must never be displayed or persisted in browser web storage.
+Passwords must never be displayed, returned in API responses, or stored in browser web storage.
 
-### 5.2 Login
+### 4.2 Login
 
-1. User opens `/login`.
+**Route:** `/login`
+
+User journey:
+
+1. User opens the login page.
 2. User enters email and password.
-3. Frontend submits to `POST /api/v1/auth/login`.
-4. Backend validates credentials.
-5. On success, backend issues the configured HttpOnly authentication cookie.
-6. Frontend retrieves the current user through `GET /api/v1/auth/me`.
-7. User enters `/app/projects`.
+3. Frontend validates basic form input.
+4. User submits credentials.
+5. Backend retrieves the account.
+6. Backend verifies the password hash.
+7. Backend creates a signed JWT.
+8. Backend sets the `cg_access` HttpOnly cookie.
+9. Frontend receives the successful authentication response.
+10. User is redirected to `/projects`.
 
-Incorrect credentials produce a generic authentication error.
+Incorrect credentials must return a generic authentication error rather than revealing whether an email address exists.
 
-### 5.3 Session restoration
+### 4.3 Session Restoration
 
-When an authenticated application loads:
+When the application loads:
 
-1. Frontend requests `/api/v1/auth/me`.
-2. Backend validates the authentication cookie.
-3. If valid, the user context is restored.
-4. If invalid or expired, protected application state is cleared.
-5. User is redirected to login.
+1. Frontend requests the authenticated user's information through `/api/v1/auth/me`.
+2. Browser automatically supplies the authentication cookie.
+3. Backend verifies the token.
+4. Backend retrieves the authenticated account.
+5. Frontend restores the user's application context.
+6. Protected routes become accessible.
 
-The frontend must not attempt to decode or directly read the HttpOnly JWT.
+If the session is invalid or expired:
 
-### 5.4 Logout
+- User-specific cached information must be cleared.
+- Protected routes must become inaccessible.
+- User must be redirected to login.
 
-1. User selects Logout.
-2. Frontend sends `POST /api/v1/auth/logout`.
+The frontend must not attempt to read the HttpOnly JWT.
+
+### 4.4 Logout
+
+User journey:
+
+1. User selects Sign Out from the sidebar.
+2. Frontend initiates the logout mutation.
 3. Backend clears the authentication cookie.
-4. Frontend clears user-specific cached data.
-5. User is redirected to login.
+4. Frontend clears authenticated application state.
+5. User is redirected to `/login`.
 
-If the server request fails, the UI must not claim that the server-side logout succeeded. It may still clear local interface state and explain that the session could not be confirmed as terminated.
+While logout is pending, the action must remain disabled to prevent repeated submissions.
 
-## 6. Project management flow
+If the logout request fails, the UI must show an error and must not claim that the server-side session was successfully terminated.
 
-### 6.1 Projects list
+---
 
-The authenticated user opens `/app/projects`.
+## 5. Project Management Flow
 
-The screen displays:
+### 5.1 Projects Workspace
+
+**Route:** `/projects`
+
+The Projects workspace is the default authenticated landing page.
+
+It displays the projects associated with the current user.
+
+Primary information:
 
 - Project name.
-- Short description.
-- Last updated timestamp.
-- Specification version count.
-- Recent comparison activity where available.
+- Project description.
+- Creation or modification timestamp.
+- Specification version information where available.
+
+Primary actions:
+
+- Create Project.
+- Open Project.
+- Update Project.
+- Delete Project.
+
+The interface should remain uncluttered when the user owns only one or two projects.
+
+### 5.2 Empty Projects State
+
+When no project exists, display an empty state explaining that the user needs to create a project before uploading specifications.
 
 Primary action:
 
-`Create Project`
+**Create Your First Project**
 
-### 6.2 Create project
+The interface must make the next action obvious rather than displaying an empty table without explanation.
+
+### 5.3 Create Project
+
+User journey:
 
 1. User selects Create Project.
-2. A project form is displayed.
-3. User enters a required name and optional description.
-4. Frontend validates the form.
-5. Backend receives `POST /api/v1/projects`.
-6. Backend derives project ownership from the authenticated user.
-7. Project is created.
-8. User is redirected to the new project's overview.
+2. Project creation form opens.
+3. User enters a project name.
+4. User optionally enters a description.
+5. Frontend performs input validation.
+6. Backend validates the request.
+7. Backend derives ownership from the authenticated user.
+8. Project is created.
+9. Projects query is refreshed.
+10. User can open the newly created project.
 
-The user cannot supply or change `ownerId`.
+A client request must never be allowed to assign a different project owner.
 
-### 6.3 Project overview
+### 5.4 Project Overview
 
-The project overview displays:
+**Route:** `/projects/:projectId`
 
-- Project metadata.
-- Specification versions.
+The project overview provides the central context for specification management and comparisons.
+
+It may display:
+
+- Project name.
+- Project description.
+- Specification version history.
 - Recent comparisons.
-- Recent test runs.
-- Upload and compare actions.
+- Recent project activity.
+- Upload Specification action.
+- Compare Versions action.
 
-An empty project displays a clear first action:
+An empty project should display an informative first-use state.
 
-`Upload your first OpenAPI specification`
+### 5.5 Update Project
 
-### 6.4 Update and deletion
+User journey:
 
-A project owner may:
+1. User opens the project overview.
+2. User selects the project editing action.
+3. Name and description fields become editable.
+4. User makes the required changes.
+5. Frontend validates input.
+6. Backend verifies ownership.
+7. Project is updated.
+8. The displayed project information is refreshed.
 
-- Rename the project.
-- Update its description.
-- Soft-delete the project.
+### 5.6 Delete Project
 
-Soft deletion:
+The current Phase 5 project service performs project deletion through a MongoDB transaction.
 
-- Hides the project from normal project lists.
-- Prevents new uploads, comparisons, tests, and runs.
-- Retains historical resources and references.
-- Does not permanently delete related records in v1.
+The deletion process removes dependent project records before deleting the project record.
 
-A confirmation step is required before deletion.
+User journey:
 
-## 7. Specification upload flow
+1. User selects Delete Project.
+2. Confirmation dialog explains the destructive action.
+3. User explicitly confirms.
+4. Frontend submits the deletion request.
+5. Backend verifies project ownership.
+6. Backend begins the database transaction.
+7. Associated project-owned records are deleted.
+8. Project is deleted.
+9. Transaction commits.
+10. Frontend returns to the Projects workspace.
 
-### 7.1 Upload entry point
+Project deletion is currently a permanent deletion operation with dependent-record cleanup, not soft deletion.
+
+The interface must display a clear warning before the action.
+
+If the operation fails, the user must receive an error rather than a false success confirmation.
+
+---
+
+## 6. Specification Management Flow
+
+### 6.1 Upload Entry Point
 
 The user opens a project and selects:
 
-`Upload Specification`
+**Upload Specification**
 
-The upload interface accepts:
+Supported formats:
 
-- JSON.
-- YAML.
+- OpenAPI JSON.
+- OpenAPI YAML.
 
-The user supplies:
-
-- A file.
-- A required version label.
-
-Maximum upload size:
+The initial upload limit is:
 
 `1 MiB`
 
-The interface clearly displays the allowed formats and size limit.
+The upload form contains:
 
-### 7.2 Upload processing
+- File selection.
+- Version label where applicable.
+- Upload action.
+
+The application should communicate the supported file formats and size limit before submission.
+
+### 6.2 Upload Processing
 
 ```mermaid
 flowchart TD
-    Select["Select Specification File"]
-    ClientCheck["Client File Checks"]
-    Submit["Submit Multipart Upload"]
-    Size["Backend Size Enforcement"]
-    Format["Format Detection"]
-    Parse["Parse and Validate"]
-    Version["OpenAPI Version Check"]
-    Refs["Reference Safety Check"]
+    Select["Select Specification"]
+    Client["Client-Side File Validation"]
+    Submit["Submit Upload"]
+    Ownership["Verify Project Ownership"]
+    Limit["Enforce Upload Limits"]
+    Format["Validate File Format"]
+    Parse["Parse OpenAPI Document"]
+    Version["Validate OpenAPI Version"]
+    Reference["Validate Internal References"]
     Normalize["Normalize Supported Constructs"]
-    Hash["SHA-256 Content Hash"]
+    Hash["Calculate SHA-256"]
     Duplicate{"Duplicate Content?"}
-    Store["Store Immutable Version"]
-    Error["Display Upload Diagnostics"]
-    Complete["Display Version Details"]
+    Persist["Persist Specification Version"]
+    Success["Display Version Details"]
+    Failure["Display Validation Diagnostics"]
 
-    Select --> ClientCheck
-    ClientCheck --> Submit
-    Submit --> Size
-    Size --> Format
+    Select --> Client
+    Client --> Submit
+    Submit --> Ownership
+    Ownership --> Limit
+    Limit --> Format
     Format --> Parse
     Parse --> Version
-    Version --> Refs
-    Refs --> Normalize
+    Version --> Reference
+    Reference --> Normalize
     Normalize --> Hash
     Hash --> Duplicate
-    Duplicate -->|"Yes"| Error
-    Duplicate -->|"No"| Store
-    Store --> Complete
-    Size -->|"Failure"| Error
-    Format -->|"Failure"| Error
-    Parse -->|"Failure"| Error
-    Version -->|"Unsupported"| Error
-    Refs -->|"Unresolvable"| Error
+    Duplicate -->|"No"| Persist
+    Duplicate -->|"Yes"| Failure
+    Persist --> Success
+    Ownership -->|"Failure"| Failure
+    Limit -->|"Failure"| Failure
+    Format -->|"Failure"| Failure
+    Parse -->|"Failure"| Failure
+    Version -->|"Unsupported"| Failure
+    Reference -->|"Failure"| Failure
 ```
 
-The backend is authoritative for all upload checks.
+Client-side validation improves the user experience, but the backend independently performs all security and specification checks.
 
-Frontend extension and size checks improve usability but do not replace backend validation.
+### 6.3 Successful Upload
 
-### 7.3 Successful upload
+Following successful processing, the version detail view displays:
 
-The version detail screen displays:
-
-- Version label.
+- Specification label.
 - OpenAPI version.
+- Document title.
 - Source format.
-- Upload time.
 - Operation count.
+- Upload timestamp.
 - Parsing status.
-- Runner eligibility.
-- Warnings, where applicable.
+- Explorer completeness.
+- Relevant support warnings.
 
-The original uploaded specification is preserved.
+Original uploaded source content must remain unchanged.
 
-A valid specification can be explored and used for comparison.
+The specification version becomes available to the API Explorer and comparison workflows when its validation status permits.
 
-### 7.4 Invalid upload
+### 6.4 Duplicate Upload
 
-Examples:
+The backend computes a SHA-256 hash from the original uploaded bytes.
+
+If identical content already exists in the same project:
+
+- Duplicate detection is triggered.
+- A duplicate resource error is returned.
+- A second identical version is not silently created.
+
+### 6.5 Invalid Specification
+
+Invalid conditions may include:
 
 - Malformed JSON.
 - Invalid YAML.
 - Unsupported OpenAPI version.
-- Invalid OpenAPI structure.
-- Oversized document.
+- Invalid document structure.
+- Oversized upload.
+- Unsupported file format.
 - Duplicate content.
-- Unsupported custom dialect.
-- Excessive nesting or parsed node count.
-- Unresolved relevant references.
+- Unresolved internal references.
+- Excessive parser depth or node count.
 
-Behavior:
+The application must:
 
-- Show an actionable error.
-- Identify the relevant source location where available.
-- Do not mark the version as valid.
-- Do not allow invalid versions to be compared or executed.
-- Do not silently discard unsupported constructs and report complete parsing.
+- Present actionable error information.
+- Preserve useful source-location diagnostics where available.
+- Avoid enabling comparison for invalid specification versions.
+- Avoid silently discarding unsupported features.
+- Never report full compatibility merely because parsing succeeded.
 
-A bounded invalid upload may be retained with parser status and diagnostics, according to the persistence policy.
+### 6.6 Partially Supported Specification
 
-### 7.5 Partial support
+A valid OpenAPI document may contain constructs outside ContractGuard's supported analysis subset.
 
-A structurally valid document may contain constructs that ContractGuard cannot fully analyze.
+The interface must distinguish:
 
-The application must distinguish:
-
-- Invalid document.
+- Valid and fully supported specification.
+- Valid but partially supported specification.
+- Invalid specification.
 - Unsupported OpenAPI version.
-- Valid document with unsupported features.
-- Fully supported document.
 
-A valid document with unsupported relevant features may be stored and explored with warnings, but its comparison or validation result must reflect the unsupported behavior.
+A partially supported document may still be available for supported exploration operations, but comparison results must reflect the limitations.
 
-## 8. API Explorer flow
+---
 
-### 8.1 Entry
+## 7. API Explorer Flow
 
-The user opens a valid specification version and selects:
+### 7.1 Entry
 
-`Explore API`
+**Route:** `/projects/:projectId/specifications/:specVersionId/explorer`
 
-### 8.2 Explorer layout
+A user reaches the API Explorer through a selected specification version in the project workspace.
 
-The API Explorer presents:
+### 7.2 Explorer Responsibilities
 
-- Path list.
+The explorer provides a read-only interface for inspecting the uploaded API contract.
+
+It displays:
+
+- API paths.
 - HTTP methods.
-- Operation summaries.
-- Parameters.
-- Request body.
-- Responses.
-- Supported schema details.
-- Reference navigation.
+- Operation identifiers.
+- Operation summaries and descriptions.
+- Effective parameters.
+- Supported request-body definitions.
+- Response definitions.
+- Reusable schema components.
+- Internal reference information.
+- Source JSON Pointers.
 - Support warnings.
 
-### 8.3 Interaction
+### 7.3 Operation Exploration
 
-1. User selects a path.
-2. User selects an operation.
-3. Operation details appear.
-4. User expands a request or response section.
-5. User selects a referenced schema.
-6. The interface navigates to the schema definition or displays its supported details.
-7. Unsupported constructs are clearly identified.
+User journey:
 
-### 8.4 Restrictions
+1. User opens the API Explorer.
+2. The application retrieves the specification's operations.
+3. The path and method list is displayed.
+4. User selects an operation.
+5. The operation-detail panel opens.
+6. User inspects parameters, request definitions, and response definitions.
+7. User can expand relevant schema structures.
+8. User can navigate to referenced components when supported.
+
+The selected operation should remain identifiable while the user explores its details.
+
+### 7.4 Component Exploration
+
+The explorer allows users to inspect supported reusable components.
+
+User journey:
+
+1. User selects a component category.
+2. Application retrieves the components belonging to that category.
+3. User selects a component.
+4. The component definition is displayed.
+5. Supported internal references can be followed.
+6. The interface displays relevant reference-resolution information.
+
+The displayed component must retain its original source identity.
+
+### 7.5 Reference Navigation
+
+The explorer provides visibility into:
+
+- Original `$ref` values.
+- Source locations.
+- Resolved target pointers.
+- Reference-resolution chains where available.
+- Circular-reference information.
+- Unresolved-reference diagnostics.
+
+External references are not fetched.
+
+The explorer must never use an uploaded document's server definitions as execution destinations.
+
+### 7.6 Explorer Restrictions
 
 The API Explorer is read-only.
 
-It does not:
+It is not a general-purpose HTTP client.
 
-- Send requests to specification server URLs.
-- Execute user-provided examples.
-- Contact external references.
-- Act as a general HTTP client.
+It must not:
 
-The explorer renders specification content as data, not executable browser markup.
+- Execute uploaded examples.
+- Fetch arbitrary server URLs.
+- Contact external reference URLs.
+- Execute document-provided code or scripts.
+- Treat specification content as browser markup.
 
-## 9. Version comparison flow
+Specification content must be rendered as safe data.
 
-### 9.1 Entry points
+---
 
-The user may open comparison creation from:
+## 8. Version Comparison Flow
+
+### 8.1 Entry Points
+
+Comparison creation is accessible from:
 
 - Project overview.
 - Specification version history.
-- Comparison history.
+- Comparison workspace.
 
 Primary action:
 
-`Compare Versions`
+**Compare Versions**
 
-### 9.2 Version selection
+### 8.2 Version Selection
 
 The user selects:
 
+- Baseline specification version.
+- Candidate specification version.
+
+The interface must clearly explain the distinction:
+
+**Baseline:** The existing contract expected by consumers.
+
+**Candidate:** The proposed updated contract provided by the API.
+
+The same version cannot be selected for both roles.
+
+Both versions must belong to the same owned project and meet the comparison eligibility requirements.
+
+### 8.3 Comparison Creation
+
+```mermaid
+flowchart TD
+    Start["Select Compare Versions"]
+    Baseline["Select Baseline"]
+    Candidate["Select Candidate"]
+    Validate["Validate Version Selection"]
+    Submit["Submit Comparison"]
+    Ownership["Verify Ownership"]
+    Load["Load Specification Versions"]
+    Match["Match API Operations"]
+    Analyze["Apply Compatibility Rules"]
+    Impact["Calculate Reference Impact"]
+    Report["Build Comparison Report"]
+    Status["Determine Analysis Status"]
+    Persist["Persist Report"]
+    Display["Open Comparison Report"]
+
+    Start --> Baseline
+    Baseline --> Candidate
+    Candidate --> Validate
+    Validate --> Submit
+    Submit --> Ownership
+    Ownership --> Load
+    Load --> Match
+    Match --> Analyze
+    Analyze --> Impact
+    Impact --> Report
+    Report --> Status
+    Status --> Persist
+    Persist --> Display
+```
+
+### 8.4 Comparison Direction
+
+The comparison direction is:
+
+`BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`
+
+The interface must make it clear that the candidate is evaluated against existing consumer expectations.
+
+The comparison uses the server-controlled ruleset:
+
+`CG-COMPAT-1.1`
+
+The frontend cannot change the ruleset identifier or select an alternative compatibility direction.
+
+### 8.5 Comparison Processing
+
+The backend:
+
+1. Verifies project ownership.
+2. Loads both specification versions.
+3. Validates their eligibility.
+4. Retrieves normalized representations.
+5. Matches baseline and candidate operations.
+6. Evaluates supported compatibility rules.
+7. Evaluates supported shared-schema impact.
+8. Generates stable finding identifiers.
+9. Calculates classification summaries.
+10. Determines overall analysis status.
+11. Persists the comparison report.
+
+The compatibility engine is deterministic and does not use AI for classifications.
+
+### 8.6 Comparison Outcomes
+
+#### COMPLETE
+
+All relevant constructs within the supported analysis scope were evaluated.
+
+This does not prove that a real provider implementation is runtime-compatible.
+
+#### PARTIAL
+
+One or more relevant constructs could not be completely evaluated.
+
+The interface must display the unsupported or incomplete analysis information.
+
+#### FAILED
+
+The comparison could not be completed due to an unrecoverable failure.
+
+The interface must display an appropriate error and preserve the user's ability to retry when appropriate.
+
+A partial report must never be presented as a complete compatibility assessment.
+
+---
+
+## 9. Comparison Workspace
+
+### 9.1 Overview
+
+The comparison workspace is the primary ContractGuard analysis interface.
+
+It should organize information around three connected responsibilities:
+
+1. Comparison context and version information.
+2. Compatibility findings and filters.
+3. Selected finding details and test impact.
+
+The interface must prioritize explainability rather than displaying only numerical classification totals.
+
+### 9.2 Comparison Summary
+
+The overview presents:
+
 - Baseline version.
 - Candidate version.
-
-The interface explains:
-
-- Baseline = existing consumer contract.
-- Candidate = new provider contract.
-
-The same version cannot be selected for both sides.
-
-Both versions must belong to the same project and be valid comparison inputs.
-
-### 9.3 Comparison creation
-
-1. User selects baseline and candidate.
-2. Frontend displays the comparison direction.
-3. User submits the request.
-4. Backend verifies ownership and version compatibility.
-5. Backend loads normalized representations.
-6. Compatibility engine matches operations.
-7. Supported rules are applied.
-8. Shared-schema impact is evaluated.
-9. Stable findings are generated.
-10. Overall analysis status is calculated.
-11. Report is persisted.
-12. User is navigated to the comparison workspace.
-
-The compatibility engine does not use AI to determine findings.
-
-### 9.4 Comparison result
-
-The comparison page displays:
-
-- Baseline and candidate labels.
-- Ruleset version.
 - Comparison direction.
-- Overall analysis status.
-- Classification counts.
-- Detected changes.
-- Unsupported analysis warnings.
+- Ruleset version.
+- Analysis status.
+- Breaking finding count.
+- Potentially breaking finding count.
+- Non-breaking finding count.
+- Informational finding count.
+- Unsupported finding count.
 
-Classification filters:
+### 9.3 Finding List
 
-- Breaking.
-- Potentially breaking.
-- Non-breaking.
-- Informational.
-- Unsupported.
+The finding list organizes changes by classification, operation, and source location.
 
-The user can also filter by path and HTTP method.
+The user should be able to:
 
-### 9.5 Comparison outcomes
+- Filter by classification.
+- Filter by HTTP method where applicable.
+- Filter by API path.
+- Select a finding.
+- View its summary.
+- Identify the associated compatibility rule.
 
-**Complete analysis**
+Each finding should be understandable without requiring the user to inspect raw database records.
 
-Every relevant compared construct was handled by the supported ruleset.
+### 9.4 Finding Details
 
-This does not establish runtime compatibility.
+Selecting a finding opens its detail context.
 
-**Partial analysis**
+The detail area displays:
 
-At least one relevant construct could not be completely evaluated.
+- Stable change identifier.
+- Rule identifier.
+- Classification.
+- HTTP method and path where applicable.
+- Original operation key.
+- Source JSON Pointer.
+- Baseline value where available.
+- Candidate value where available.
+- Summary.
+- Compatibility rationale.
+- Affected operation keys.
+- Available linked test cases.
+- Coverage state where supported.
 
-The interface must highlight the unsupported portion and explain why.
+The rationale should explain why the relevant compatibility rule applies.
 
-**Failed analysis**
+### 9.5 Shared-Schema Impact
 
-The comparison could not be produced due to an unrecoverable error.
+When a shared schema component changes:
 
-The interface offers an appropriate recovery action, such as reviewing the documents or retrying after correcting a problem.
+1. The compatibility engine identifies the changed schema location.
+2. Reverse-reference impact analysis identifies supported referencing operations.
+3. Candidate operation matches are translated to their corresponding baseline operation keys.
+4. The finding receives its affected operation keys.
+5. The detail area displays the affected operations.
+6. Coverage lookup uses the baseline test-case library.
 
-A partial result must never be presented as completely compatible.
+The v1 impact analysis uses a conservative reference closure within the containing operation scope. Consequently, it may over-approximate impact when several unrelated schemas are referenced in one scope.
 
-## 10. Comparison workspace and change detail flow
+Only schema-comparison findings fan out through shared references.
 
-### 10.1 Primary comparison workspace
+Non-schema metadata changes, status-code changes, parameter metadata changes, and request-body requiredness changes remain associated with their direct operation.
 
-This is the signature ContractGuard screen.
+If the reference graph is incomplete, external, unresolved, circular, or exceeds configured analysis limits, the application must show the corresponding warning and partial-analysis status.
 
-It presents three coordinated areas:
+The interface must never imply pointer-exact impact when the underlying analysis is conservative.
 
-1. Version comparison and source context.
-2. Change list and filters.
-3. Change details and test impact.
+---
 
-The screen must support:
+## 10. Change-to-Test Coverage Flow
 
-- Quick severity scanning.
-- Operation-level navigation.
-- JSON Pointer/source-location context.
-- Rationale inspection.
-- Affected-operation review.
-- Test coverage inspection.
+### 10.1 Purpose
 
-### 10.2 Change selection
+Change-to-test traceability connects compatibility findings to test cases associated with the affected baseline operations.
 
-1. User selects a finding from the change list.
-2. Detail panel opens.
-3. ContractGuard displays its rule ID.
-4. Baseline and candidate values are shown where available.
-5. Classification and rationale are displayed.
-6. Affected operation keys are listed.
-7. Linked baseline test cases are retrieved.
-8. Coverage status is displayed.
+The primary relationship is:
 
-### 10.3 Shared-schema change
+**Finding → Affected Operations → Baseline Test Cases → Coverage Status**
 
-When a shared component changes:
+Coverage is derived from the current test-case library.
 
-1. The finding identifies the source component.
-2. The reference-impact analysis identifies supported referencing operations.
-3. The detail panel lists affected operations.
-4. The test-coverage projection retrieves test cases belonging to those operations.
-5. Unsupported reference impact remains explicitly visible.
+It is not an independent mutable record stored inside a completed comparison.
 
-If a shared-reference relationship cannot be established, the application must not pretend that the impact list is exhaustive.
+### 10.2 Coverage Entry Point
 
-### 10.4 Coverage states
+**Route:** `/projects/:projectId/diff-reports/:reportId/coverage`
 
-`COVERED`
+The comparison report acts as the source of the baseline version ID.
 
-At least one approved test case is linked to an affected operation.
+The frontend retrieves the comparison and uses its baseline specification version to load the appropriate test-case library and coverage information.
 
-`DRAFT_ONLY`
+### 10.3 Coverage Summary
 
-Test cases exist but none is approved.
+The coverage view displays:
 
-`UNCOVERED`
+- Total comparison changes.
+- Covered changes.
+- Draft-only changes.
+- Uncovered changes.
+- Unmapped changes.
 
-No test case is linked.
+### 10.4 Coverage Status Definitions
 
-The interface must explain that coverage means test-case availability, not successful execution.
+**COVERED**
 
-## 11. Test-case management flow
+Every affected baseline operation has at least one approved linked test case.
 
-### 11.1 Entry points
+**DRAFT_ONLY**
 
-A user can open test-case management from:
+Every affected baseline operation has a linked case, but at least one affected operation is covered only by draft cases.
 
-- An API Explorer operation.
-- A change detail panel.
-- A comparison test-coverage section.
-- The project's test-case list.
+**UNCOVERED**
 
-### 11.2 Create manual test case
+At least one affected baseline operation has no linked draft or approved test case.
 
-1. User selects an operation.
-2. User chooses Create Test Case.
-3. Operation details are displayed.
-4. User enters a title and optional description.
-5. User supplies supported path/query parameter values.
-6. User optionally configures supported assertions.
-7. Frontend validates the form.
-8. Backend validates the operation and input values.
-9. Test case is stored as `DRAFT`.
-10. User can review and approve it.
+**UNMAPPED**
 
-A test case is created against the specification version that defines the baseline consumer contract.
+The finding does not contain a usable affected operation key.
 
-### 11.3 Approval flow
+### 10.5 Operation-Complete Coverage Rule
 
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT
-    DRAFT --> APPROVED: User approves
-    DRAFT --> ARCHIVED: User archives
-    APPROVED --> ARCHIVED: User archives
+Coverage is evaluated independently for every affected baseline operation.
+
+For example, if a shared-schema change affects three operations:
+
+- Operation A has an approved case.
+- Operation B has an approved case.
+- Operation C has only a draft.
+
+The finding is `DRAFT_ONLY`, not `COVERED`.
+
+If Operation C has no linked case, the finding is `UNCOVERED`.
+
+Archived cases are ignored.
+
+A single approved case for one affected operation cannot cover a finding affecting multiple operations.
+
+### 10.6 Coverage Details
+
+For each finding, the view displays:
+
+- Number of affected operations.
+- Number of approved-covered operations.
+- Number of draft-only operations.
+- Number of uncovered operations.
+- Number of linked test cases.
+- Approved case count.
+- Draft case count.
+- Linked test-case information.
+
+### 10.7 Important Interpretation
+
+Coverage represents test-case availability.
+
+It does not establish:
+
+- Test execution success.
+- Candidate response validity.
+- Production compatibility.
+- API availability.
+
+Successful regression execution will be represented separately through the future test-run workflow.
+
+---
+
+## 11. Test-Case Management Flow
+
+### 11.1 Entry Points
+
+The test-case library is accessible from:
+
+- API Explorer operation context.
+- Specification-version context.
+- Project workspace navigation.
+- Comparison coverage view.
+
+Current route:
+
+`/projects/:projectId/specifications/:specVersionId/test-cases`
+
+### 11.2 Test-Case Library
+
+The library displays saved cases associated with one specification version.
+
+Information includes:
+
+- Test-case title.
+- Operation method.
+- Operation path.
+- Source.
+- Lifecycle status.
+- Creation date.
+- Updated date.
+
+Available status filters:
+
+- All cases.
+- Draft.
+- Approved.
+- Archived.
+
+The library must distinguish draft test definitions from approved cases.
+
+### 11.3 Create Manual Test Case
+
+The current v1 manual workflow supports GET path operations only.
+
+User journey:
+
+1. User opens the baseline test-case library.
+2. User selects New Test Case.
+3. A creation panel opens.
+4. User selects an available GET operation.
+5. User enters a title.
+6. User optionally enters a description.
+7. User enters path and query parameter values as JSON.
+8. User defines supported response assertions.
+9. Frontend validates JSON structure.
+10. User submits the form.
+11. Backend verifies the baseline specification version.
+12. Backend verifies the canonical operation key and original operation path.
+13. Backend verifies required and declared parameter values.
+14. Backend validates assertions.
+15. Test case is stored in `DRAFT` status.
+16. The library refreshes.
+17. The created case becomes available for inspection.
+
+### 11.4 Supported Request Inputs
+
+The current test-case model supports:
+
+- Path parameters.
+- Query parameters.
+
+The request input structure is:
+
+```json
+{
+  "pathParams": {
+    "recordId": "record-100"
+  },
+  "queryParams": {
+    "includeHistory": "false"
+  }
+}
 ```
 
-Only approved test cases are eligible for execution.
+The backend validates parameter names and required values against the effective baseline operation definition.
 
-The backend controls the state transition.
+The following are not accepted:
 
-The frontend cannot turn a test case into an approved case by changing a request-body field.
+- User-supplied target URLs.
+- Arbitrary hostnames.
+- Custom request headers.
+- Authentication credentials.
+- Arbitrary network destinations.
+- Request-body execution.
+- Executable scripts or shell commands.
 
-Approved test cases must not be silently modified after a run has used them.
+### 11.5 Response Assertions
 
-If a correction is required, create a new draft based on the previous case and review it separately.
+The current test-case workflow supports:
 
-### 11.4 Test-case validation errors
+- Expected HTTP status.
+- Property-value assertions.
+- Property-presence assertions.
+- Required-property assertions.
 
-Possible errors:
+Assertions must be valid, bounded JSON structures.
 
-- Operation does not exist in the selected baseline version.
-- Parameter name does not match the operation.
-- Required input is missing.
-- Input violates supported parameter constraints.
-- Unsupported serialization behavior.
-- Invalid assertion structure.
-- Input exceeds configured length limits.
+The baseline API response schema remains the authoritative contract for the future regression runner.
 
-Display a field-specific diagnostic wherever possible.
+### 11.6 Test-Case Detail
 
-## 12. AI-assisted test suggestion flow
+Selecting a saved case opens its detail panel.
 
-### 12.1 Eligibility
+The detail view displays:
 
-AI suggestions are optional.
+- Title.
+- Description.
+- Baseline operation.
+- Canonical operation key.
+- Request inputs.
+- Response assertions.
+- Current lifecycle status.
+- Creation timestamp.
+- Updated timestamp.
+- Approval timestamp where applicable.
 
-The feature is available only for recognized bundled synthetic Demo Store fixtures and supported operations.
+### 11.7 Draft Editing
 
-A user-uploaded specification must not be sent to the unpaid AI provider.
+Only draft test cases can be modified.
 
-### 12.2 User journey
+The user can update:
 
-```mermaid
-flowchart TD
-    Select["Select Eligible Synthetic Operation"]
-    Preview["Preview Information to Share"]
-    Consent{"Explicit consent?"}
-    Check["Verify Fixture Eligibility"]
-    Request["Send Bounded Context to Backend AI Service"]
-    Provider["Gemini Developer API"]
-    Validate["Validate Structured Output"]
-    Draft["Create DRAFT Suggestions"]
-    Review["User Reviews Suggestions"]
-    Approve["User Approves"]
-    Run["Eligible for Test Run"]
-    Reject["Do Not Send / Explain Restriction"]
+- Title.
+- Description.
+- Request inputs.
+- Assertions.
 
-    Select --> Preview
-    Preview --> Consent
-    Consent -->|"No"| Reject
-    Consent -->|"Yes"| Check
-    Check --> Request
-    Request --> Provider
-    Provider --> Validate
-    Validate --> Draft
-    Draft --> Review
-    Review --> Approve
-    Approve --> Run
-```
+The backend revalidates the operation and its required input values.
 
-### 12.3 Consent screen
+Attempts to edit approved or archived cases are rejected.
 
-Before submission, show:
+### 11.8 Approval Workflow
 
-- Selected operation.
-- Fixture identity.
-- Sanitized information to be shared.
-- External provider disclosure.
-- Relevant unpaid-provider data-use warning.
+Allowed state transitions:
 
-The user explicitly accepts the submission.
+`DRAFT → APPROVED`
 
-Consent is required for each provider submission.
+`DRAFT → ARCHIVED`
 
-### 12.4 AI output handling
+`APPROVED → ARCHIVED`
 
-- The backend validates the response structure.
-- Unknown fields are rejected.
-- Unsupported operations are rejected.
-- Arbitrary URLs and executable code are rejected.
-- Accepted suggestions become draft test cases.
-- The user reviews and approves each case.
+Only draft cases can be approved.
 
-AI never determines compatibility classifications or regression results.
+Approval is a server-controlled action.
 
-### 12.5 AI unavailable
+On successful approval:
 
-Possible conditions:
+- Status becomes `APPROVED`.
+- Approval timestamp is recorded.
+- The test-case library refreshes.
+- Associated comparison coverage queries are invalidated.
 
-- No API key.
-- Feature disabled.
-- Provider quota exceeded.
-- Provider unavailable.
-- Timeout.
-- Invalid model output.
-- Invalid structured response.
+Approved cases are not silently edited.
 
-The application displays a useful explanation.
+Corrections require a new draft test case.
 
-Manual test creation and all core comparison features continue working.
+### 11.9 Archive Workflow
 
-No paid provider fallback is attempted.
+Archiving removes a test case from active coverage and future eligibility.
 
-## 13. Regression execution flow
+The historical record remains available.
 
-### 13.1 Eligibility requirements
+Archived cases are read-only and do not contribute to coverage calculations.
 
-The user can start a test run only when:
+### 11.10 Validation and Error States
 
-- The project is active.
-- The comparison belongs to the project.
-- The candidate version is associated with a recognized bundled implementation.
-- The comparison has an appropriate baseline version.
-- Every selected test case belongs to that baseline version.
-- Every selected test case is approved.
-- The test count is within the configured maximum.
-- Execution concurrency limits permit the run.
+Possible failures include:
 
-An arbitrary uploaded specification cannot become a runner target merely by declaring a server URL.
+- Unsupported operation method.
+- Invalid operation key.
+- Incorrect operation path.
+- Missing required path value.
+- Missing required query value.
+- Undeclared parameter.
+- Invalid JSON input.
+- Invalid assertion format.
+- Input-size violation.
+- Invalid lifecycle transition.
+- Resource ownership failure.
 
-### 13.2 Start run
+The interface should preserve user-entered values where appropriate and display the returned validation message.
+
+---
+
+## 12. Regression Execution Flow — Planned Phase 7
+
+**Status: Not implemented.**
+
+This section documents the intended user journey for the subsequent regression-runner phase. It must not be presented as an available current feature.
+
+### 12.1 Purpose
+
+The regression runner will determine whether a bundled candidate implementation continues to satisfy the expectations of test cases created against the baseline contract.
+
+The runner is intentionally restricted to a known bundled implementation rather than arbitrary external API URLs.
+
+### 12.2 Execution Eligibility
+
+A future test run will require:
+
+- An accessible comparison report.
+- An eligible candidate specification version.
+- A recognized trusted bundled fixture.
+- An accessible baseline specification version.
+- Approved test cases belonging to that baseline version.
+- Supported GET operations.
+- Valid request inputs.
+- Available execution capacity.
+
+Draft and archived cases must not be executed.
+
+### 12.3 Planned User Journey
 
 1. User opens a comparison.
-2. User selects the Tests section.
-3. ContractGuard displays linked approved baseline test cases.
-4. User chooses the cases to execute.
-5. The UI displays the selected test count and known execution limitations.
-6. User selects Run Tests.
-7. Frontend sends the selected test-case IDs and comparison context.
-8. Backend independently validates every relationship and approval state.
-9. Server chooses the trusted bundled candidate implementation.
-10. A test run is created with `QUEUED` status.
-11. The API returns `202 Accepted`.
-12. The interface opens the run-detail view.
+2. User accesses the Test Cases section.
+3. Application displays approved baseline test cases.
+4. User selects eligible test cases.
+5. Application displays the selection count.
+6. Application validates runner eligibility.
+7. User selects Run Tests.
+8. Backend validates the comparison and test-case references.
+9. Server resolves the trusted bundled implementation.
+10. A test-run record is created.
+11. The execution queue processes the selected cases.
+12. Candidate responses are received from the bundled implementation.
+13. Responses are validated against the baseline response schema.
+14. Explicit assertions are evaluated.
+15. Results and bounded evidence are persisted.
+16. User reviews individual test outcomes and the overall run summary.
 
-The client never supplies the execution URL, host, IP address, or alternative implementation version.
+### 12.4 Planned Execution Boundaries
 
-### 13.3 Run execution
-
-```mermaid
-flowchart TD
-    Queued["QUEUED"]
-    Running["RUNNING"]
-    Load["Load Approved Baseline Test Cases"]
-    Fixture["Resolve Trusted Candidate Fixture"]
-    Construct["Construct GET Request Inputs"]
-    Execute["Invoke Bundled Candidate Handler"]
-    Response["Receive Candidate Response"]
-    Validate["Validate Against Baseline Response Schema"]
-    Assert["Evaluate Explicit Assertions"]
-    Result["Persist Bounded Test Result"]
-    More{"More selected cases?"}
-    Final["Calculate Run Summary"]
-    Status["Set Terminal Run Status"]
-
-    Queued --> Running
-    Running --> Load
-    Load --> Fixture
-    Fixture --> Construct
-    Construct --> Execute
-    Execute --> Response
-    Response --> Validate
-    Validate --> Assert
-    Assert --> Result
-    Result --> More
-    More -->|"Yes"| Construct
-    More -->|"No"| Final
-    Final --> Status
-```
-
-### 13.4 Execution constraints
-
-V1 supports:
-
-- GET operations only.
-- Bundled Demo Store implementations.
-- Up to 20 approved test cases per run.
-- Two concurrent runs.
-- Two concurrent tests per run.
+- Maximum 20 cases per run.
+- Maximum two concurrent runs.
+- Maximum two concurrent tests per run.
 - Five-second per-test timeout.
 - Sixty-second total run deadline.
+- GET operations only.
+- Bounded response bodies and evidence.
+- Server-controlled fixture selection.
+- No arbitrary network target.
 
-The interface must not suggest that ContractGuard can test arbitrary production APIs.
-
-### 13.5 Run statuses
-
-Run-level statuses:
+### 12.5 Planned Run States
 
 - `QUEUED`
 - `RUNNING`
@@ -831,291 +1168,360 @@ Individual test results:
 - `UNSUPPORTED`
 - `ERROR`
 
-A timeout, unsupported operation, or execution error must never be displayed as a successful test.
+### 12.6 Planned Result Interpretation
 
-`CANCELLED` is not part of the v1 workflow.
+**PASSED:** Every executed supported case passes.
 
-### 13.6 Run result definitions
+**FAILED:** One or more executed cases fail and no unsupported or execution-error condition makes the result partial.
 
-**PASSED**
+**PARTIAL:** One or more selected cases cannot be evaluated completely.
 
-Every executed supported test passed, with no unsupported or errored result affecting the run.
+**INTERRUPTED:** Execution cannot be completed because the application process stops or the run is otherwise interrupted.
 
-**FAILED**
+A failed assertion must not be confused with a runner infrastructure error.
 
-One or more executed tests failed contract or assertion checks, and no unsupported or execution-error condition makes the run partial.
+A partially evaluated run must not be presented as completely successful.
 
-**PARTIAL**
+### 12.7 Planned Run Detail Screen
 
-One or more selected tests could not be completely evaluated, including unsupported cases or execution errors.
+The future run detail page should display:
 
-**INTERRUPTED**
-
-The process stopped before the run could be finalized.
-
-### 13.7 Run detail screen
-
-Display:
-
-- Run ID.
+- Run identifier.
 - Comparison reference.
-- Baseline version.
-- Candidate version.
+- Baseline and candidate versions.
 - Ruleset version.
-- Fixture implementation version.
+- Candidate fixture version.
 - Run status.
-- Start and completion times.
-- Total/pass/fail/skip/unsupported/error counts.
-- Individual test results.
-- Actual response status when available.
-- Duration.
-- Validation diagnostics.
-- Bounded sanitized evidence.
+- Execution timestamps.
+- Total test count.
+- Passed count.
+- Failed count.
+- Unsupported count.
+- Error count.
+- Individual results.
+- Bounded validation diagnostics.
+- Sanitized evidence.
 
-The interface must distinguish a contract failure from an infrastructure or support limitation.
+### 12.8 Planned Run History
 
-### 13.8 Status updates
+The user will be able to reopen previous test runs through their associated comparison.
 
-Use TanStack Query polling for non-terminal runs.
+Historical records must preserve their original test inputs, assertions, comparison reference, and execution evidence.
 
-Suggested initial polling behavior:
+---
 
-- Poll every two seconds while the run is actively executing.
-- Increase the interval when the run remains active for longer periods.
-- Stop polling after a terminal state.
-- Allow manual refresh.
+## 13. AI-Assisted Test Suggestions — Planned Phase 8
 
-Socket.IO and persistent streaming infrastructure are not required.
+**Status: Not implemented.**
 
-### 13.9 Interrupted run
+AI-assisted test generation is an optional enhancement.
 
-If the application server restarts before completion:
+It will not be a prerequisite for the core ContractGuard workflow.
 
-1. Startup recovery identifies unfinished runs.
-2. Their status becomes `INTERRUPTED`.
-3. The user sees an interruption message.
-4. The user may inspect any persisted evidence.
-5. The user may start a new run after rechecking eligibility.
+### 13.1 Purpose
 
-Do not automatically present an interrupted run as successful or retry it as though no execution occurred.
+The proposed feature will help users identify additional test scenarios for supported operations in the bundled synthetic Demo Store fixtures.
 
-## 14. History and reporting flow
+### 13.2 Eligibility
 
-### 14.1 Comparison history
+Only recognized bundled synthetic fixtures may be submitted to the unpaid AI provider.
 
-Project overview displays recent comparisons.
+The following information must not be submitted:
 
-The comparison-history screen includes:
+- Arbitrary user-uploaded specifications.
+- Private production contracts.
+- Authentication credentials.
+- Production request or response data.
+- Sensitive user information.
 
-- Baseline version.
-- Candidate version.
-- Creation date.
+### 13.3 Planned User Journey
+
+1. User selects an eligible synthetic operation.
+2. Application constructs a bounded context preview.
+3. User reviews what information would be submitted.
+4. Application explains the external AI-provider disclosure.
+5. User explicitly consents.
+6. Backend verifies fixture eligibility.
+7. Backend constructs a controlled prompt.
+8. Gemini Developer API generates structured suggestions.
+9. Backend validates the response schema.
+10. Unsupported or malformed output is rejected.
+11. Valid suggestions are stored as `DRAFT` test cases.
+12. User reviews each suggestion.
+13. User edits, approves, or archives the suggestion.
+
+### 13.4 AI Restrictions
+
+AI must never:
+
+- Decide compatibility classifications.
+- Determine actual regression pass/fail results.
+- Approve test cases autonomously.
+- Select arbitrary execution targets.
+- Execute generated code.
+- Bypass backend validation.
+
+The application must remain functional without AI configuration.
+
+No paid fallback is permitted within the v1 design.
+
+---
+
+## 14. Comparison and Test History
+
+### 14.1 Comparison History
+
+The project workspace provides access to previous comparison reports.
+
+Users should be able to inspect:
+
+- Baseline and candidate version labels.
+- Comparison date.
+- Comparison direction.
 - Ruleset version.
 - Analysis status.
-- Classification summary.
+- Classification summaries.
 
-Selecting a report opens its saved findings without rerunning the comparison.
+Opening an existing comparison retrieves its stored findings rather than rerunning the compatibility engine.
 
-### 14.2 Test-run history
+Its coverage projection may be refreshed from the current baseline test-case library.
 
-The user can inspect runs for a comparison.
+### 14.2 Historical Integrity
 
-The interface displays:
+Historical comparison findings must remain immutable.
 
-- Run date.
-- Run status.
-- Test count.
-- Pass/fail/partial summary.
-- Associated comparison.
-- Selected baseline test cases.
+Creating or approving a new test case may change the current coverage projection, but must not rewrite the original comparison findings or change their ruleset.
 
-Selecting a run displays its persisted result evidence.
+A future test run must preserve the comparison and specification-version references that were used during execution.
 
-### 14.3 Historical consistency
+Historical execution evidence must not be silently replaced by newer results.
 
-A new specification upload must not rewrite earlier comparisons.
+### 14.3 Navigation Between History and Analysis
 
-A new ruleset version must not silently reinterpret old reports.
+The user should be able to move between:
 
-A new test case must not modify earlier run results.
+- Project overview.
+- Comparison list.
+- Individual comparison report.
+- Test-case library.
+- Comparison coverage.
 
-A test case edited or replaced after a run must not alter the historical test-run snapshot.
+Each navigation transition must preserve the appropriate project and resource context.
 
-## 15. Screen inventory
+---
 
-| Screen | Primary purpose | Key actions |
-|---|---|---|
-| Login | Authenticate user | Login |
-| Registration | Create account | Register |
-| Projects | Display personal projects | Create/open project |
-| Project overview | Show versions and activity | Upload, compare |
-| Specification upload | Import OpenAPI files | Upload |
-| Specification detail | Inspect version and validation | Explore, compare |
-| API Explorer | Inspect operations and schemas | Create test case |
-| Comparison creation | Choose comparison versions | Compare |
-| Comparison workspace | Inspect API changes | Filter, inspect |
-| Change detail | Explain one finding | View impact and coverage |
-| Test-case library | Manage baseline cases | Create, edit, approve, archive |
-| Test-case detail | Inspect one test | Review and approve |
-| AI suggestion review | Review proposed tests | Accept, edit, reject |
-| Test-run detail | Monitor and inspect evidence | Refresh, view results |
-| Comparison history | Revisit reports | Open report |
-| Account | Account details and logout | Logout |
+## 15. Global Application States
 
-## 16. Global interface states
+Every significant screen must handle appropriate application states.
 
-Every major screen must account for appropriate application states.
+### 15.1 Loading
 
-### 16.1 Loading
+Loading states are required when:
 
-Display a clear loading state when data is being retrieved or an action is being processed.
+- Current user information is being retrieved.
+- Project information is loading.
+- Specification details are being retrieved.
+- Operations are being loaded.
+- Comparison reports are being generated or retrieved.
+- Test cases are being loaded.
+- Coverage projections are being calculated.
 
-Avoid showing stale or misleading data as if the new action has succeeded.
+Loading indicators should be clear and proportional to the operation.
 
-### 16.2 Empty
+Avoid replacing an entire screen when a smaller section can display its own loading state.
+
+### 15.2 Empty
 
 Examples:
 
-- No projects yet.
-- No specification versions uploaded.
-- No comparisons created.
+- No projects exist.
+- A project contains no specifications.
+- No operations are available.
+- No comparisons have been created.
 - No test cases exist.
-- No test runs recorded.
-- No test coverage is linked to a change.
+- No cases are available under the selected filter.
+- No test cases are linked to a finding.
+- A comparison has no changes.
 
-Every empty state should explain what the user can do next.
+Empty states should explain why the section is empty and provide an appropriate next action.
 
-### 16.3 Error
+### 15.3 Error
+
+Errors may arise from:
+
+- Authentication expiry.
+- Network failures.
+- Invalid request data.
+- Inaccessible resources.
+- Upload validation.
+- Unsupported documents.
+- Comparison failures.
+- Test-case lifecycle conflicts.
+- Database failures.
+
+Display useful messages and provide retry or recovery actions wherever practical.
+
+Do not expose internal stack traces, database queries, or implementation details.
+
+### 15.4 Partial
+
+Partial states are particularly important to ContractGuard.
 
 Examples:
 
-- Authentication expired.
-- Network failure.
-- Invalid resource ID.
-- Upload rejected.
-- Database unavailable.
-- Comparison failed.
-- Test execution could not start.
+- Unsupported OpenAPI constructs.
+- Unresolved references.
+- Incomplete shared-schema impact analysis.
+- Unsupported response-schema validation.
+- Partial future regression runs.
+- Unsupported candidate operations.
 
-Display an actionable error and preserve relevant user input where safe.
+The interface must explain which parts were analyzed successfully and which remain uncertain.
 
-### 16.4 Partial
+### 15.5 Success
 
-Partial states are particularly important.
-
-Examples:
-
-- Some OpenAPI constructs are unsupported.
-- Reference impact cannot be fully determined.
-- Some selected tests are unsupported.
-- One or more execution errors occur.
-- AI provider response fails validation.
-
-The interface must explain what was evaluated and what remains uncertain.
-
-### 16.5 Success
-
-Display confirmation when an operation has actually succeeded according to the backend response.
+Success messages should only appear after the backend confirms the action.
 
 Examples:
 
 - Project created.
 - Specification uploaded.
-- Comparison completed.
+- Comparison created.
+- Test case created.
 - Test case approved.
-- Test run completed.
+- Test case archived.
 
-Do not claim that an asynchronous run passed merely because it was accepted for execution.
+Starting a future asynchronous test run must not be represented as a successful test execution merely because the run was accepted.
 
-## 17. Access and state-transition rules
+---
 
-The backend enforces the following conditions:
+## 16. Security and Authorization Workflow
+
+The backend enforces the following rules independently of the frontend.
 
 | Action | Required condition |
 |---|---|
-| Upload specification | Active project owned by user |
-| Create comparison | Both valid versions belong to same owned project |
-| Create test case | Valid operation in selected specification version |
+| Register | Valid registration data |
+| Login | Valid account credentials |
+| Retrieve current user | Valid authentication cookie |
+| Create project | Authenticated user |
+| Update project | Project owned by authenticated user |
+| Delete project | Project owned by authenticated user |
+| Upload specification | Active accessible project and valid upload |
+| Explore specification | Accessible specification version |
+| Create comparison | Both versions belong to the same owned project |
+| View comparison | Report belongs to an owned project |
+| List test cases | Specification belongs to an owned project |
+| Create test case | Valid GET path operation in the selected version |
+| Update test case | Owned draft test case |
 | Approve test case | Owned draft test case |
-| Create test run | Owned comparison with eligible candidate fixture |
-| Select test case | Approved and belongs to comparison baseline |
-| View test-run details | Run belongs to an owned project |
-| Request AI suggestion | Eligible synthetic fixture and explicit consent |
-| Update project | Active project owned by user |
+| Archive test case | Owned draft or approved test case |
+| Create future test run | Eligible comparison, candidate fixture, and approved baseline cases |
+| Request future AI suggestion | Eligible synthetic fixture and explicit consent |
 
-The frontend may disable unavailable actions, but the backend must independently enforce all conditions.
+Unsafe cookie-authenticated requests must satisfy the configured Origin validation policy.
 
-## 18. Error and recovery matrix
+The browser must not be able to bypass ownership, approval, or execution eligibility rules through modified request payloads.
 
-| Scenario | Expected behavior |
+---
+
+## 17. Error and Recovery Matrix
+
+| Scenario | Expected application behavior |
 |---|---|
-| Upload exceeds 1 MiB | Reject upload and display size limit |
-| Invalid JSON/YAML | Show parse diagnostics |
-| Unsupported OpenAPI version | Show unsupported-version message |
-| Unsupported schema construct | Preserve visible partial-analysis warning |
-| Duplicate specification content | Show duplicate-upload error |
-| Baseline/candidate belong to different projects | Reject comparison |
-| Candidate lacks recognized fixture profile | Allow comparison; disable regression execution |
-| Test case belongs to another baseline | Reject test-run creation |
-| Test case is still a draft | Reject execution |
-| User selects more than 20 cases | Reject or prevent selection according to the configured limit |
-| Runner concurrency limit reached | Explain temporary unavailability |
-| Individual execution times out | Mark individual result as error and aggregate appropriately |
-| Server restarts during run | Mark unfinished run interrupted |
-| AI is not configured | Disable AI feature; preserve manual workflow |
-| AI quota is exceeded | Display provider-unavailable message |
-| AI output is invalid | Reject suggestion and retain safe application state |
-| Authentication expires | Clear protected state and request login |
-| User accesses another user's resource | Return safe not-found response |
+| Invalid login credentials | Generic authentication error |
+| Authentication cookie expired | Clear protected state and redirect to login |
+| User opens another user's project | Safe not-found state |
+| Project creation validation fails | Display field-level error |
+| Upload exceeds configured limit | Reject upload and display size information |
+| Invalid JSON/YAML | Display parser diagnostics |
+| Unsupported OpenAPI version | Display unsupported-version message |
+| Relevant schema construct unsupported | Display warning and partial-analysis state |
+| Duplicate specification content | Display duplicate-resource error |
+| Baseline and candidate are identical | Reject comparison |
+| Specification versions belong to different projects | Reject comparison |
+| Comparison fails | Preserve the project context and display an error |
+| Reference impact is incomplete | Display partial-analysis warning |
+| Test case uses an unsupported HTTP method | Reject creation |
+| Required parameter is missing | Display validation error |
+| User edits an approved case | Reject with lifecycle conflict |
+| User edits an archived case | Reject with lifecycle conflict |
+| Test case is archived | Exclude it from current coverage |
+| One affected operation lacks an approved case | Do not mark the finding covered |
+| Candidate lacks a trusted execution fixture | Future runner must disable execution |
+| AI provider unavailable | Keep manual workflow functional |
 
-## 19. User-interface acceptance criteria
+---
 
-- The user can complete registration and login.
-- The user can create and open a project.
-- The user can upload valid JSON and YAML OpenAPI documents.
-- The user receives understandable validation errors.
-- The user can explore operations and supported schemas.
-- The user can select baseline and candidate versions.
-- The comparison page clearly identifies the comparison direction.
-- The user can filter and inspect changes.
-- Each supported change displays its rule ID, source location, and rationale.
-- The user can inspect affected operations.
-- The user can see linked test cases and coverage status.
-- The user can create, review, approve, and archive test cases.
-- AI suggestions are visibly optional and clearly identified as generated drafts.
-- The user can execute eligible approved tests against the bundled candidate implementation.
-- The user can review test-run status and bounded evidence.
-- The user can distinguish passing, failing, partial, unsupported, and interrupted outcomes.
-- Historical comparisons and test runs can be reopened.
-- All major screens have loading, empty, error, and relevant partial states.
-- Core application navigation remains usable without AI configuration.
+## 18. Screen Inventory
 
-## 20. Design dependency
+| Screen | Primary responsibility | Current status |
+|---|---|---|
+| Registration | Create user account | Implemented |
+| Login | Authenticate user | Implemented |
+| Projects workspace | Display personal projects | Implemented |
+| Project overview | Display project information and versions | Implemented |
+| Specification upload | Import OpenAPI file | Implemented |
+| Specification version detail | Inspect uploaded version | Implemented |
+| API Explorer | Browse operations and references | Core implemented |
+| Comparison workspace | Create comparisons | Implemented |
+| Comparison report | Inspect compatibility findings | Implemented |
+| Test-case library | Manage baseline test cases | Phase 6 implementation prepared |
+| Test-case detail/editor | Edit and approve drafts | Phase 6 implementation prepared |
+| Test coverage | Inspect change coverage | Phase 6 implementation prepared |
+| Regression run screen | Execute and inspect results | Planned Phase 7 |
+| AI suggestion review | Review generated cases | Planned Phase 8 |
 
-The visual layout, screen density, interaction details, component hierarchy, responsive behavior, and accessibility requirements are specified in `Design.md`.
+Implementation status is subject to the verification and acceptance checks recorded in `ImplementationPlan.md`.
 
-This document defines the application workflow and behavior.
+---
 
-`Design.md` defines how that behavior is presented to the user.
+## 19. User Experience Acceptance Criteria
 
-The two documents must remain consistent.
+The application flow is considered acceptable when:
 
-## 21. Related technical references
+1. A user can register and authenticate.
+2. Authentication state is restored safely after page reload.
+3. A user can create, update, open, and delete a project.
+4. A user can upload supported OpenAPI documents.
+5. Upload errors and unsupported constructs are communicated clearly.
+6. A user can explore paths, operations, and supported schemas.
+7. A user can compare a baseline and candidate specification.
+8. The comparison direction is visible and understandable.
+9. A user can filter and inspect compatibility findings.
+10. Findings display meaningful rule IDs, source locations, and rationales.
+11. Shared-schema changes identify supported affected operations.
+12. Incomplete impact analysis is presented honestly.
+13. A user can open the baseline test-case library.
+14. A user can create and edit manual GET test cases.
+15. A user can approve or archive eligible test cases.
+16. Coverage is derived from baseline test cases and affected operation keys.
+17. Every affected operation must have approved coverage before a change is marked `COVERED`.
+18. Archived cases do not contribute to coverage.
+19. Coverage and regression execution results are presented as separate concepts.
+20. The application does not expose arbitrary external API execution.
+21. Future AI functionality remains optional, consent-gated, and human-reviewed.
+22. Primary screens provide appropriate loading, empty, error, and partial states.
+23. Navigation preserves project and comparison context.
+24. Backend ownership and lifecycle controls remain authoritative.
 
-- React Router:  
-  https://reactrouter.com/
+---
 
-- TanStack Query:  
-  https://tanstack.com/query/latest/docs/framework/react
+## 20. Related Documentation
 
-- Express:  
-  https://expressjs.com/
+| Document | Responsibility |
+|---|---|
+| `README.md` | Product overview, setup, technology stack, and current status |
+| `PRD.md` | Product goals, scope, personas, and functional requirements |
+| `Design.md` | Visual system, interface composition, and accessibility |
+| `TRD.md` | Runtime, dependencies, technical choices, and implementation constraints |
+| `Architecture.md` | System architecture, module responsibilities, and data flow |
+| `Schema.md` | MongoDB models, relationships, and data lifecycle |
+| `API.md` | Backend endpoints and request/response contracts |
+| `Rules.md` | Compatibility direction, classifications, and deterministic rules |
+| `SecurityReview.md` | Security threats, controls, and verification requirements |
+| `ImplementationPlan.md` | Development phases, milestones, and acceptance tracking |
 
-- React Hook Form:  
-  https://react-hook-form.com/
+These documents should remain consistent.
 
-- OWASP CSRF Prevention:  
-  https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
-
-- OWASP SSRF Prevention:  
-  https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+A change to application behavior must be reflected in the relevant product, technical, API, and implementation documentation.

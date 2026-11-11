@@ -24,6 +24,7 @@ const ProjectPage = lazy(() => import("./pages/ProjectPage.jsx"));
 const ApiExplorerPage = lazy(() => import("./pages/ApiExplorerPage.jsx"));
 const ComparisonPage = lazy(() => import("./pages/ComparisonPage.jsx"));
 const DiffReportPage = lazy(() => import("./pages/DiffReportPage.jsx"));
+const TestCasesPage = lazy(() => import("./pages/TestCasesPage.jsx"));
 
 const RouteLoading = () => (
   <main
@@ -105,6 +106,16 @@ const App = () => {
             <Route
               path="/projects/:projectId/diff-reports/:reportId"
               element={<DiffReportPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/specifications/:specVersionId/test-cases"
+              element={<TestCasesPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/diff-reports/:reportId/coverage"
+              element={<TestCasesPage />}
             />
           </Route>
         </Route>

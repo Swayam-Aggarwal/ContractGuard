@@ -32,7 +32,7 @@ The reverse comparison direction is not supported in v1. Reversing the baseline 
 | `INFORMATIONAL` | Documentation or metadata changed without an identified contract impact. |
 | `UNSUPPORTED` | The change involves a construct that the current ruleset cannot reliably analyze. |
 
-### 2.1 Overall analysis status
+### 2.1 Overall Analysis Status
 
 | Status | Meaning |
 |---|---|
@@ -44,11 +44,11 @@ A report with unsupported changes must never be represented as fully compatible.
 
 A `COMPLETE` report does not mean that the candidate API implementation has been proven correct. It only means that the supported specification changes were analyzed successfully.
 
-## 3. Fundamental compatibility principles
+## 3. Fundamental Compatibility Principles
 
 Request and response compatibility operate in opposite directions.
 
-### 3.1 Request compatibility
+### 3.1 Request Compatibility
 
 An existing consumer may send any request that was valid under the baseline contract.
 
@@ -60,7 +60,7 @@ Therefore:
 
 Examples:
 
-| Baseline request | Candidate request | Expected result |
+| Baseline Request | Candidate Request | Expected Result |
 |---|---|---|
 | `age`: integer, minimum 0 | `age`: integer, minimum 18 | `BREAKING` |
 | `age`: integer, minimum 0 | `age`: integer, minimum 0 | `NON_BREAKING` |
@@ -72,7 +72,7 @@ A stricter candidate request schema may reject values that existing baseline con
 
 A broader candidate request schema generally preserves existing requests.
 
-### 3.2 Response compatibility
+### 3.2 Response Compatibility
 
 An existing consumer may rely on the response structure and values described by the baseline contract.
 
@@ -84,7 +84,7 @@ Therefore:
 
 Examples:
 
-| Baseline response | Candidate response | Expected result |
+| Baseline Response | Candidate Response | Expected Result |
 |---|---|---|
 | `price`: number | `price`: string | `BREAKING` |
 | Enum: `INR`, `USD` | Enum: `INR` | `NON_BREAKING` |
@@ -96,18 +96,18 @@ A candidate response schema that allows a wider range of values may produce valu
 
 A narrower candidate response schema generally produces a subset of previously documented values.
 
-### 3.3 Schema inclusion principle
+### 3.3 Schema Inclusion Principle
 
 When the engine can prove the relationship between two supported schemas:
 
-- **Request:** candidate accepted-input set must contain the baseline accepted-input set.
-- **Response:** candidate possible-output set must be contained within the baseline accepted-input set.
+- **Request:** The candidate accepted-input set must contain the baseline accepted-input set.
+- **Response:** The candidate possible-output set must be contained within the baseline accepted-input set.
 
 The engine must not guess when it cannot prove the relationship.
 
 If a comparison depends on unsupported schema semantics, it must produce an `UNSUPPORTED` finding and make the overall report `PARTIAL`.
 
-## 4. Rule assumptions and limitations
+## 4. Rule Assumptions and Limitations
 
 - OpenAPI descriptions may be incomplete or inaccurate.
 - The engine analyzes documented contracts, not hidden runtime behavior.
@@ -119,7 +119,7 @@ If a comparison depends on unsupported schema semantics, it must produce an `UNS
 - A classification is a compatibility signal, not proof that a real implementation is safe.
 - Runtime compatibility is verified separately through the bounded regression runner.
 
-## 5. Operation-level rules
+## 5. Operation-Level Rules
 
 Operations are matched using HTTP method and canonicalized path structure.
 
@@ -134,7 +134,7 @@ Operations are matched using HTTP method and canonicalized path structure.
 | `OP-007` | Operation becomes deprecated | `INFORMATIONAL` | Signals possible future removal; current request shape may remain valid. |
 | `OP-008` | HTTP method changes | `BREAKING` | Existing consumers may call a method no longer described for the operation. |
 
-### 5.1 Canonical path matching
+### 5.1 Canonical Path Matching
 
 Path parameters must be normalized for operation matching without discarding their original names.
 
@@ -160,7 +160,7 @@ Canonicalization requirements:
 
 The OpenAPI restriction against templated paths that differ only in parameter names must be respected.
 
-## 6. Parameter rules
+## 6. Parameter Rules
 
 Parameters are resolved from supported path-level and operation-level definitions.
 
@@ -186,7 +186,7 @@ Effective parameters are matched as follows:
 | `PAR-011` | Description or example changes only | `INFORMATIONAL` | No structural request change identified. |
 | `PAR-012` | Parameter location changes | `BREAKING` | Existing requests send the parameter in a different location than the candidate expects. |
 
-## 7. Request-body rules
+## 7. Request-Body Rules
 
 | Rule ID | Condition | Classification | Rationale |
 |---|---|---|---|
@@ -213,7 +213,7 @@ Examples of stricter request constraints include:
 - `maxItems` decreases.
 - An enum value is removed.
 
-## 8. Response rules
+## 8. Response Rules
 
 | Rule ID | Condition | Classification | Rationale |
 |---|---|---|---|
@@ -250,7 +250,7 @@ Examples of broader response constraints include:
 - An enum value is added.
 - A previously non-nullable property becomes nullable.
 
-## 9. Security and server metadata rules
+## 9. Security and Server Metadata Rules
 
 | Rule ID | Condition | Classification | Rationale |
 |---|---|---|---|
@@ -260,7 +260,7 @@ Examples of broader response constraints include:
 | `SRV-001` | Server URL changes | `INFORMATIONAL` | Deployment location changed; runtime reachability is not tested in v1. |
 | `SRV-002` | Server variable or default changes | `POTENTIALLY_BREAKING` | Generated clients or environments may resolve to a different host. |
 
-## 10. Schema comparison scope
+## 10. Schema Comparison Scope
 
 The initial comparator supports the following structural elements within explicitly supported schema constructs:
 
@@ -293,15 +293,19 @@ If a relevant change depends on unsupported semantics:
 4. Set the overall report status to `PARTIAL`.
 5. Do not silently treat the change as compatible.
 
-### 10.1 Unsupported-analysis diagnostic
+### 10.1 Unsupported-Analysis Diagnostic
 
 | Diagnostic ID | Condition | Classification | Rationale |
 |---|---|---|---|
 | `SCH-001` | A relevant schema, reference, serialization, security, server, or parser construct cannot be evaluated completely by the supported v1 subset | `UNSUPPORTED` | The analyzer must expose uncertainty rather than silently assigning a compatibility result. |
 
-`SCH-001` is a diagnostic rule identifier. It does not claim that the underlying construct is always breaking; it records that the analyzer cannot prove compatibility. The finding must include the affected source location where available, a stable change ID, a summary, a rationale, and affected operation keys where known. Any report containing `SCH-001` must have `PARTIAL` analysis status.
+`SCH-001` is a diagnostic rule identifier. It does not claim that the underlying construct is always breaking; it records that the analyzer cannot prove compatibility.
 
-## 11. Reference-resolution requirements
+The finding must include the affected source location where available, a stable change ID, a summary, a rationale, and affected operation keys where known.
+
+Any report containing `SCH-001` must have `PARTIAL` analysis status.
+
+## 11. Reference-Resolution Requirements
 
 - Resolve internal document references only.
 - Do not fetch external references over the network.
@@ -313,7 +317,7 @@ If a relevant change depends on unsupported semantics:
 
 External references are disabled in v1 to prevent unintended network access and SSRF risks.
 
-## 12. Deterministic comparison algorithm
+## 12. Deterministic Comparison Algorithm
 
 The implementation must follow a stable sequence:
 
@@ -334,7 +338,7 @@ The implementation must follow a stable sequence:
 15. Mark the report `PARTIAL` if any relevant construct was unsupported.
 16. Persist the ruleset identifier and both specification-version identifiers with the report.
 
-### 12.1 Stable change identifiers
+### 12.1 Stable Change Identifiers
 
 Each finding must include:
 
@@ -360,7 +364,7 @@ Changes must be sorted consistently by:
 
 The same input documents and ruleset must produce the same ordered comparison findings.
 
-## 13. Rule test-fixture requirements
+## 13. Rule Test-Fixture Requirements
 
 Every implemented rule must have automated tests containing:
 
@@ -388,7 +392,7 @@ Tests must include:
 
 For direction-sensitive rules, include paired fixtures that demonstrate why request and response changes are evaluated differently.
 
-## 14. Ruleset versioning
+## 14. Ruleset Versioning
 
 The ruleset identifier is stored with every comparison report.
 

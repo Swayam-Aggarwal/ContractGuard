@@ -7,6 +7,7 @@ import healthRouter from "./routes/health.routes.js";
 import createAuthRouter from "./routes/auth.routes.js";
 import createProjectRouter from "./routes/project.routes.js";
 import createSpecVersionRouter from "./routes/specVersion.routes.js";
+import createTestCaseRouter from "./routes/testCase.routes.js";
 
 import createCorsMiddleware from "./middleware/cors.middleware.js";
 import createOriginMiddleware from "./middleware/origin.middleware.js";
@@ -52,6 +53,7 @@ const createApp = (config) => {
   app.use("/api/v1/health", healthRouter);
   app.use("/api/v1/auth", createAuthRouter(config));
   app.use("/api/v1/projects", createProjectRouter(config));
+  app.use("/api/v1", createTestCaseRouter(config));
   app.use("/api/v1/specifications", createSpecVersionRouter(config));
 
   // Unknown routes.
