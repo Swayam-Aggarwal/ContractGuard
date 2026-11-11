@@ -1,4 +1,3 @@
-
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -77,7 +76,8 @@ describe("Schema type compatibility regressions", () => {
     expect(expansion.warnings).toEqual([]);
     expect(expansion.changes[0]).toMatchObject({
       changeType: "SCHEMA_TYPE_CHANGED",
-      severity: "BREAKING",
+      classification: "POTENTIALLY_BREAKING",
+      severity: "INFO",
     });
 
     expect(narrowing.warnings).toEqual([]);
@@ -106,7 +106,7 @@ describe("Schema type compatibility regressions", () => {
 });
 
 describe("Demo Store v1 to v2 compatibility regression", () => {
-  it("reports the price number-to-string change as breaking and completes analysis", () => {
+  it("reports the price number-to-string change as breaking without double-counting irrelevant numeric constraints", () => {
     const baseline = readExample("demo-store-v1.yaml");
     const candidate = readExample("demo-store-v2.yaml");
 
@@ -119,16 +119,18 @@ describe("Demo Store v1 to v2 compatibility regression", () => {
     expect(result.warnings).toEqual([]);
 
     expect(result.summary).toMatchObject({
-      totalChanges: 8,
-      breakingChanges: 6,
+      totalChanges: 7,
+      breakingChanges: 5,
       nonBreakingChanges: 2,
       informationalChanges: 0,
+      potentiallyBreaking: 0,
     });
 
     expect(result.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "SCHEMA_TYPE_CHANGED",
+          classification: "BREAKING",
           severity: "BREAKING",
           field: expect.stringContaining("price.type"),
           oldValue: ["number"],
@@ -136,5 +138,13 @@ describe("Demo Store v1 to v2 compatibility regression", () => {
         }),
       ])
     );
+
+    expect(
+      result.changes.some(
+        (change) =>
+          change.field.includes("price.minimum") &&
+          change.changeType === "SCHEMA_CONSTRAINT_CHANGED"
+      )
+    ).toBe(false);
   });
 });

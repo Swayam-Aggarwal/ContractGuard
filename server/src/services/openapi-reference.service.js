@@ -11,6 +11,10 @@ import {
   MAX_EXPLORER_REFERENCE_DEPTH,
 } from "../constants/openapi.js";
 
+import {
+  registerOpenApiDocumentContext,
+} from "./openapi-schema-normalization.service.js";
+
 const isRecord = (value) => {
   return (
     value !== null &&
@@ -44,6 +48,10 @@ const createOpenApiReferenceService = (document) => {
   if (!isRecord(document)) {
     throw new TypeError("An OpenAPI document object is required.");
   }
+
+  // Register version/dialect context against the original object graph.
+  // WeakMap registration does not mutate or clone uploaded specification data.
+  registerOpenApiDocumentContext(document);
 
   const getReferenceTarget = (reference) => {
     const result = resolveJsonPointer(document, reference);

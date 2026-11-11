@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 
 import {
@@ -35,11 +34,13 @@ import "./ComparisonPages.css";
 
 const EMPTY_ARRAY = Object.freeze([]);
 
-const SEVERITY_OPTIONS = [
-  { value: "all", label: "All severities" },
+const CLASSIFICATION_OPTIONS = [
+  { value: "all", label: "All classifications" },
   { value: "BREAKING", label: "Breaking" },
+  { value: "POTENTIALLY_BREAKING", label: "Potentially breaking" },
   { value: "NON_BREAKING", label: "Non-breaking" },
-  { value: "INFO", label: "Informational" },
+  { value: "INFORMATIONAL", label: "Informational" },
+  { value: "UNSUPPORTED", label: "Unsupported" },
 ];
 
 const CATEGORY_LABELS = {
@@ -68,20 +69,37 @@ const formatDate = (value) => {
   }).format(date);
 };
 
-const formatSeverity = (severity) => {
-  if (severity === "BREAKING") return "Breaking";
-  if (severity === "NON_BREAKING") return "Non-breaking";
-  if (severity === "INFO") return "Informational";
+const getChangeClassification = (change) => {
+  if (change.classification) return change.classification;
+  if (change.severity === "BREAKING") return "BREAKING";
+  if (change.severity === "NON_BREAKING") return "NON_BREAKING";
+  if (change.severity === "INFO") return "INFORMATIONAL";
 
-  return severity || "Unclassified";
+  return "UNSUPPORTED";
 };
 
-const getSeverityClass = (severity) => {
-  if (severity === "BREAKING") return "breaking";
-  if (severity === "NON_BREAKING") return "nonbreaking";
-  if (severity === "INFO") return "info";
+const formatClassification = (classification) => {
+  const labels = {
+    BREAKING: "Breaking",
+    POTENTIALLY_BREAKING: "Potentially breaking",
+    NON_BREAKING: "Non-breaking",
+    INFORMATIONAL: "Informational",
+    UNSUPPORTED: "Unsupported",
+  };
 
-  return "unknown";
+  return labels[classification] || "Unclassified";
+};
+
+const getClassificationClass = (classification) => {
+  const classes = {
+    BREAKING: "breaking",
+    POTENTIALLY_BREAKING: "potentially-breaking",
+    NON_BREAKING: "nonbreaking",
+    INFORMATIONAL: "info",
+    UNSUPPORTED: "unsupported",
+  };
+
+  return classes[classification] || "unknown";
 };
 
 const getPathKey = (change) => {
@@ -110,16 +128,23 @@ const formatValue = (value) => {
 
 const AnalysisStatus = ({ status }) => {
   const complete = status === "COMPLETE";
+  const failed = status === "FAILED";
 
   return (
-    <span className={`comparison-status ${complete ? "is-complete" : "is-partial"}`}>
+    <span
+      className={`comparison-status ${complete ? "is-complete" : failed ? "is-failed" : "is-partial"}`}
+    >
       {complete ? (
         <ShieldCheck size={14} />
       ) : (
         <ShieldAlert size={14} />
       )}
 
-      {complete ? "Analysis complete" : status || "Partial analysis"}
+      {complete
+        ? "Analysis complete"
+        : failed
+          ? "Analysis failed"
+          : "Partial analysis"}
     </span>
   );
 };
@@ -135,11 +160,17 @@ const SummaryCard = ({ label, value, tone, icon: Icon }) => (
   </div>
 );
 
-const ChangeSeverity = ({ severity }) => (
-  <span className={`diff-severity diff-severity-${getSeverityClass(severity)}`}>
-    {formatSeverity(severity)}
-  </span>
-);
+const ChangeClassification = ({ change }) => {
+  const classification = getChangeClassification(change);
+
+  return (
+    <span
+      className={`diff-severity diff-severity-${getClassificationClass(classification)}`}
+    >
+      {formatClassification(classification)}
+    </span>
+  );
+};
 
 const ValuePanel = ({ title, value }) => (
   <section className="diff-value-panel">
@@ -211,7 +242,7 @@ const ChangeInspector = ({ change }) => {
         <h2>{change.changeType.replaceAll("_", " ")}</h2>
 
         <div className="diff-inspector-badges">
-          <ChangeSeverity severity={change.severity} />
+          <ChangeClassification change={change} />
 
           <span className="diff-category-badge">
             {getCategoryLabel(change.category)}
@@ -221,10 +252,23 @@ const ChangeInspector = ({ change }) => {
 
       <div className="diff-inspector-message">
         <strong>What changed</strong>
-        <p>{change.message}</p>
+        <p>{change.summary || change.message}</p>
       </div>
 
+      {change.rationale && (
+        <div className="diff-inspector-message">
+          <strong>Why this classification</strong>
+          <p>{change.rationale}</p>
+        </div>
+      )}
+
       <div className="diff-inspector-location">
+        <span>Rule ID</span>
+        <strong>{change.ruleId || "Pending rule mapping"}</strong>
+
+        <span>Change ID</span>
+        <code>{change.changeId || "Not recorded"}</code>
+
         <span>HTTP method</span>
         <strong>{change.method || "Not operation-specific"}</strong>
 
@@ -236,6 +280,18 @@ const ChangeInspector = ({ change }) => {
 
         <span>Operation key</span>
         <code>{change.operationKey || "Not available"}</code>
+
+        <span>JSON Pointer</span>
+        <code>{change.jsonPointer || "Not recorded"}</code>
+
+        <span>Affected operations</span>
+        <div className="diff-inspector-operation-list">
+          {change.affectedOperationKeys?.length
+            ? change.affectedOperationKeys.map((operationKey) => (
+                <code key={operationKey}>{operationKey}</code>
+              ))
+            : <span>Not resolved</span>}
+        </div>
       </div>
 
       <section className="diff-inspector-values">
@@ -278,7 +334,7 @@ const DiffReportPage = () => {
   const { projectId, reportId } = useParams();
 
   const [search, setSearch] = useState("");
-  const [severityFilter, setSeverityFilter] = useState("all");
+  const [classificationFilter, setClassificationFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activePath, setActivePath] = useState("all");
   const [selectedChangeIndex, setSelectedChangeIndex] = useState(null);
@@ -325,12 +381,11 @@ const DiffReportPage = () => {
     const query = search.trim().toLowerCase();
 
     return changeRecords.filter((change) => {
-      const severity = change.severity ||
-        (change.breaking ? "BREAKING" : "INFO");
+      const classification = getChangeClassification(change);
 
-      const matchesSeverity =
-        severityFilter === "all" ||
-        severity === severityFilter;
+      const matchesClassification =
+        classificationFilter === "all" ||
+        classification === classificationFilter;
 
       const matchesCategory =
         categoryFilter === "all" ||
@@ -347,6 +402,9 @@ const DiffReportPage = () => {
         change.changeType,
         change.field,
         change.message,
+        change.summary,
+        change.rationale,
+        change.ruleId,
         change.operationKey,
       ]
         .filter(Boolean)
@@ -356,7 +414,7 @@ const DiffReportPage = () => {
       const matchesSearch = !query || searchContent.includes(query);
 
       return (
-        matchesSeverity &&
+        matchesClassification &&
         matchesCategory &&
         matchesPath &&
         matchesSearch
@@ -365,7 +423,7 @@ const DiffReportPage = () => {
   }, [
     changeRecords,
     search,
-    severityFilter,
+    classificationFilter,
     categoryFilter,
     activePath,
   ]);
@@ -428,6 +486,7 @@ const DiffReportPage = () => {
   }
 
   const isComplete = report.analysisStatus === "COMPLETE";
+  const isFailed = report.analysisStatus === "FAILED";
 
   return (
     <section className="diff-report-page">
@@ -472,6 +531,10 @@ const DiffReportPage = () => {
             <span>
               Analyzer {report.analyzerVersion}
             </span>
+
+            <span>
+              Ruleset {report.rulesetVersion || "Not recorded (legacy report)"}
+            </span>
           </div>
         </div>
 
@@ -486,11 +549,15 @@ const DiffReportPage = () => {
 
           <div>
             <strong>
-              This comparison is partial. Do not interpret it as a clean compatibility pass.
+              {isFailed
+                ? "This comparison failed. No compatibility conclusion is available."
+                : "This comparison is partial. Do not interpret it as a clean compatibility pass."}
             </strong>
 
             <p>
-              The analyzer recorded warnings while evaluating these specification versions. Some relevant constructs may not have been fully assessed. Review every warning and affected change before drawing conclusions.
+              {isFailed
+                ? "The analyzer could not complete this comparison. Review the recorded diagnostics before retrying or drawing conclusions."
+                : "The analyzer recorded warnings while evaluating these specification versions. Some relevant constructs may not have been fully assessed. Review every warning and affected change before drawing conclusions."}
             </p>
           </div>
         </section>
@@ -505,24 +572,38 @@ const DiffReportPage = () => {
         />
 
         <SummaryCard
-          label="Breaking changes"
-          value={summary?.breakingChanges}
+          label="Breaking"
+          value={summary?.breaking ?? summary?.breakingChanges}
           tone="breaking"
           icon={CircleAlert}
         />
 
         <SummaryCard
-          label="Non-breaking changes"
-          value={summary?.nonBreakingChanges}
+          label="Potentially breaking"
+          value={summary?.potentiallyBreaking}
+          tone="potentially-breaking"
+          icon={ShieldAlert}
+        />
+
+        <SummaryCard
+          label="Non-breaking"
+          value={summary?.nonBreaking ?? summary?.nonBreakingChanges}
           tone="nonbreaking"
           icon={CheckCircle2}
         />
 
         <SummaryCard
-          label="Informational changes"
-          value={summary?.informationalChanges}
+          label="Informational"
+          value={summary?.informational ?? summary?.informationalChanges}
           tone="info"
           icon={Info}
+        />
+
+        <SummaryCard
+          label="Unsupported"
+          value={summary?.unsupported}
+          tone="unsupported"
+          icon={AlertCircle}
         />
       </section>
 
@@ -621,11 +702,11 @@ const DiffReportPage = () => {
             />
 
             <select
-              value={severityFilter}
-              onChange={(event) => setSeverityFilter(event.target.value)}
-              aria-label="Filter by severity"
+              value={classificationFilter}
+              onChange={(event) => setClassificationFilter(event.target.value)}
+              aria-label="Filter by classification"
             >
-              {SEVERITY_OPTIONS.map((option) => (
+              {CLASSIFICATION_OPTIONS.map((option) => (
                 <option value={option.value} key={option.value}>
                   {option.label}
                 </option>
@@ -665,7 +746,7 @@ const DiffReportPage = () => {
                   className="comparison-text-button"
                   onClick={() => {
                     setSearch("");
-                    setSeverityFilter("all");
+                    setClassificationFilter("all");
                     setCategoryFilter("all");
                     setActivePath("all");
                   }}
@@ -683,7 +764,7 @@ const DiffReportPage = () => {
                   aria-pressed={selectedChange?.index === change.index}
                 >
                   <div className="diff-change-item-top">
-                    <ChangeSeverity severity={change.severity} />
+                    <ChangeClassification change={change} />
 
                     <span className="diff-change-category">
                       {getCategoryLabel(change.category)}
@@ -695,7 +776,7 @@ const DiffReportPage = () => {
                   </strong>
 
                   <span className="diff-change-message">
-                    {change.message}
+                    {change.summary || change.message}
                   </span>
 
                   <div className="diff-change-item-location">

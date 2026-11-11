@@ -1,4 +1,3 @@
-
 # Data Model and Schema Specification
 
 **Product:** ContractGuard  
@@ -209,6 +208,8 @@ A comparison report represents a directional compatibility analysis between two 
 | `changes` | Array | Yes | Bounded individual findings |
 | `warnings` | Array | Yes | Unsupported/partial-analysis warnings |
 | `createdAt` | Date | Yes | UTC |
+
+The stored and public canonical reference names are `baselineVersionId` and `candidateVersionId`. The previous `baselineSpecVersionId` and `candidateSpecVersionId` fields remain as compatibility aliases for existing Phase 4 data and integrations. New reports persist only the canonical fields; API responses continue exposing the legacy aliases temporarily. Readers must prefer the canonical fields and fall back to the legacy aliases when reading older reports.
 
 #### Comparison constraints
 

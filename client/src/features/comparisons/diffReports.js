@@ -1,4 +1,3 @@
-
 import {
   useMutation,
   useQuery,
@@ -36,16 +35,16 @@ export const diffReportsApi = {
 
   create: async ({
     projectId,
-    baselineSpecVersionId,
-    candidateSpecVersionId,
+    baselineVersionId,
+    candidateVersionId,
   }) => {
     const data = await apiRequest(
       `/api/v1/projects/${encodeURIComponent(projectId)}/diff-reports`,
       {
         method: "POST",
         body: {
-          baselineSpecVersionId,
-          candidateSpecVersionId,
+          baselineVersionId,
+          candidateVersionId,
         },
       }
     );

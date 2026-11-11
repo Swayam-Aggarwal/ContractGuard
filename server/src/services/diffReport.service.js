@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 import { createHash } from "node:crypto";
 
@@ -11,11 +10,17 @@ import createCompatibilityAnalysis from
 
 import AppError from "../utils/appError.js";
 
-const ANALYZER_VERSION = "2.0.1";
+import {
+  COMPATIBILITY_DIRECTION,
+  COMPATIBILITY_RULESET_VERSION,
+  createClassificationSummary,
+  createFindingContract,
+} from "./compatibility-report-contract.js";
+
+const ANALYZER_VERSION = "2.0.4";
 const DEFAULT_REPORT_LIMIT = 20;
 const MAX_REPORT_LIMIT = 50;
 
-// Keep a comfortable margin below MongoDB's 16 MiB BSON document limit.
 const MAX_REPORT_SIZE_BYTES = 8 * 1024 * 1024;
 
 const isValidObjectId = (value) => {
@@ -74,6 +79,7 @@ const createFingerprint = ({
   projectId,
   baselineContentHash,
   candidateContentHash,
+  rulesetVersion,
 }) => {
   return createHash("sha256")
     .update(
@@ -82,6 +88,7 @@ const createFingerprint = ({
         baselineContentHash,
         candidateContentHash,
         ANALYZER_VERSION,
+        rulesetVersion,
       ].join("\u0000"),
       "utf8"
     )
@@ -103,18 +110,67 @@ const getReportPayloadSize = (analysis) => {
   }
 };
 
+const toPublicSummary = (summary = {}, changes = []) => {
+  const counts = createClassificationSummary(changes);
+
+  return {
+    ...summary,
+
+    breaking:
+      summary.breaking ??
+      summary.breakingChanges ??
+      counts.breaking,
+
+    potentiallyBreaking:
+      summary.potentiallyBreaking ??
+      counts.potentiallyBreaking,
+
+    nonBreaking:
+      summary.nonBreaking ??
+      summary.nonBreakingChanges ??
+      counts.nonBreaking,
+
+    informational:
+      summary.informational ??
+      summary.informationalChanges ??
+      counts.informational,
+
+    unsupported:
+      summary.unsupported ??
+      counts.unsupported,
+  };
+};
+
+const toPublicChanges = (changes = []) => {
+  return changes.map((change) => createFindingContract(change));
+};
+
 const toPublicReport = (report) => {
   const value = typeof report.toObject === "function"
     ? report.toObject()
     : report;
 
+  const changes = toPublicChanges(value.changes ?? []);
+
   return {
     id: value._id.toString(),
     projectId: value.projectId.toString(),
-    baselineSpecVersionId:
-      value.baselineSpecVersionId.toString(),
-    candidateSpecVersionId:
-      value.candidateSpecVersionId.toString(),
+
+    baselineVersionId: (
+      value.baselineVersionId ?? value.baselineSpecVersionId
+    ).toString(),
+
+    candidateVersionId: (
+      value.candidateVersionId ?? value.candidateSpecVersionId
+    ).toString(),
+
+    baselineSpecVersionId: (
+      value.baselineSpecVersionId ?? value.baselineVersionId
+    ).toString(),
+
+    candidateSpecVersionId: (
+      value.candidateSpecVersionId ?? value.candidateVersionId
+    ).toString(),
 
     baselineLabel: value.baselineLabel,
     candidateLabel: value.candidateLabel,
@@ -123,10 +179,12 @@ const toPublicReport = (report) => {
     candidateContentHash: value.candidateContentHash,
 
     analyzerVersion: value.analyzerVersion,
+    direction: value.direction ?? null,
+    rulesetVersion: value.rulesetVersion ?? null,
     analysisStatus: value.analysisStatus,
 
-    summary: value.summary,
-    changes: value.changes,
+    summary: toPublicSummary(value.summary, changes),
+    changes,
     warnings: value.warnings,
 
     createdAt: value.createdAt,
@@ -136,16 +194,30 @@ const toPublicReport = (report) => {
 const toPublicReportSummary = (report) => {
   return {
     id: report._id.toString(),
-    baselineSpecVersionId:
-      report.baselineSpecVersionId.toString(),
-    candidateSpecVersionId:
-      report.candidateSpecVersionId.toString(),
+
+    baselineVersionId: (
+      report.baselineVersionId ?? report.baselineSpecVersionId
+    ).toString(),
+
+    candidateVersionId: (
+      report.candidateVersionId ?? report.candidateSpecVersionId
+    ).toString(),
+
+    baselineSpecVersionId: (
+      report.baselineSpecVersionId ?? report.baselineVersionId
+    ).toString(),
+
+    candidateSpecVersionId: (
+      report.candidateSpecVersionId ?? report.candidateVersionId
+    ).toString(),
 
     baselineLabel: report.baselineLabel,
     candidateLabel: report.candidateLabel,
 
+    direction: report.direction ?? null,
+    rulesetVersion: report.rulesetVersion ?? null,
     analysisStatus: report.analysisStatus,
-    summary: report.summary,
+    summary: toPublicSummary(report.summary),
 
     createdAt: report.createdAt,
   };
@@ -192,8 +264,6 @@ const createDiffReport = async (
     );
   }
 
-  // Normalize ObjectIds before equality checks and database queries.
-  // This also handles valid hexadecimal IDs supplied in uppercase.
   const normalizedProjectId = normalizeObjectId(projectId);
   const normalizedOwnerId = normalizeObjectId(ownerId);
   const baselineId = normalizeObjectId(baselineSpecVersionId);
@@ -235,12 +305,15 @@ const createDiffReport = async (
     projectId: normalizedProjectId,
     baselineContentHash: baseline.contentHash,
     candidateContentHash: candidate.contentHash,
+    rulesetVersion: COMPATIBILITY_RULESET_VERSION,
   });
 
   const existing = await DiffReport.findOne({
     projectId: normalizedProjectId,
     analysisFingerprint,
-  }).exec();
+  })
+    .lean()
+    .exec();
 
   if (existing) {
     return {
@@ -269,8 +342,8 @@ const createDiffReport = async (
       projectId: normalizedProjectId,
       createdBy: normalizedOwnerId,
 
-      baselineSpecVersionId: baseline._id,
-      candidateSpecVersionId: candidate._id,
+      baselineVersionId: baseline._id,
+      candidateVersionId: candidate._id,
 
       baselineContentHash: baseline.contentHash,
       candidateContentHash: candidate.contentHash,
@@ -279,6 +352,8 @@ const createDiffReport = async (
       candidateLabel: candidate.label,
 
       analyzerVersion: ANALYZER_VERSION,
+      direction: COMPATIBILITY_DIRECTION,
+      rulesetVersion: COMPATIBILITY_RULESET_VERSION,
       analysisFingerprint,
 
       analysisStatus: analysis.analysisStatus,
@@ -292,12 +367,13 @@ const createDiffReport = async (
       reused: false,
     };
   } catch (error) {
-    // Handle simultaneous requests for the same version pair.
     if (error?.code === 11000) {
       const existingReport = await DiffReport.findOne({
         projectId: normalizedProjectId,
         analysisFingerprint,
-      }).exec();
+      })
+        .lean()
+        .exec();
 
       if (existingReport) {
         return {
@@ -335,7 +411,7 @@ const listDiffReports = async (
     projectId: normalizeObjectId(projectId),
   })
     .select(
-      "baselineSpecVersionId candidateSpecVersionId baselineLabel candidateLabel analysisStatus summary createdAt"
+      "baselineVersionId candidateVersionId baselineSpecVersionId candidateSpecVersionId baselineLabel candidateLabel direction rulesetVersion analysisStatus summary createdAt"
     )
     .sort({
       createdAt: -1,

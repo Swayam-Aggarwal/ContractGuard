@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 import {
@@ -13,8 +12,8 @@ const createValidReport = (overrides = {}) => ({
   projectId: new mongoose.Types.ObjectId(),
   createdBy: new mongoose.Types.ObjectId(),
 
-  baselineSpecVersionId: new mongoose.Types.ObjectId(),
-  candidateSpecVersionId: new mongoose.Types.ObjectId(),
+  baselineVersionId: new mongoose.Types.ObjectId(),
+  candidateVersionId: new mongoose.Types.ObjectId(),
 
   baselineContentHash: "a".repeat(64),
   candidateContentHash: "b".repeat(64),
@@ -22,7 +21,7 @@ const createValidReport = (overrides = {}) => ({
   baselineLabel: "v1",
   candidateLabel: "v2",
 
-  analyzerVersion: "1.0.0",
+  analyzerVersion: "2.0.2",
   analysisFingerprint: "c".repeat(64),
 
   analysisStatus: "COMPLETE",
@@ -32,6 +31,11 @@ const createValidReport = (overrides = {}) => ({
     breakingChanges: 0,
     nonBreakingChanges: 0,
     informationalChanges: 0,
+    breaking: 0,
+    potentiallyBreaking: 0,
+    nonBreaking: 0,
+    informational: 0,
+    unsupported: 0,
     addedOperations: 0,
     removedOperations: 0,
     unchangedOperations: 0,
@@ -120,6 +124,11 @@ describe("DiffReport model", () => {
           breakingChanges: 1,
           nonBreakingChanges: 0,
           informationalChanges: 0,
+          breaking: 1,
+          potentiallyBreaking: 0,
+          nonBreaking: 0,
+          informational: 0,
+          unsupported: 0,
           addedOperations: 0,
           removedOperations: 1,
           unchangedOperations: 0,
@@ -129,10 +138,18 @@ describe("DiffReport model", () => {
           {
             category: "operation",
             changeType: "OPERATION_REMOVED",
+            changeId: "d".repeat(64),
+            ruleId: "OP-001",
+            classification: "BREAKING",
             severity: "BREAKING",
             breaking: true,
             method: "GET",
             path: "/products",
+            operationKey: "GET /products",
+            affectedOperationKeys: ["GET /products"],
+            jsonPointer: "#/paths/~1products/get",
+            summary: "The candidate removes GET /products.",
+            rationale: "Existing consumers may call an operation that no longer exists.",
             field: "operation",
             message: "The candidate removes GET /products.",
           },
@@ -143,6 +160,52 @@ describe("DiffReport model", () => {
     await report.validate();
 
     expect(report.changes).toHaveLength(1);
+  });
+
+  it("should persist a traceable unsupported construct finding", async () => {
+    const report = new DiffReport(
+      createValidReport({
+        analysisStatus: "PARTIAL",
+        summary: {
+          totalChanges: 1,
+          breakingChanges: 0,
+          nonBreakingChanges: 0,
+          informationalChanges: 0,
+          breaking: 0,
+          potentiallyBreaking: 0,
+          nonBreaking: 0,
+          informational: 0,
+          unsupported: 1,
+          addedOperations: 0,
+          removedOperations: 0,
+          unchangedOperations: 0,
+        },
+        changes: [
+          {
+            category: "schema",
+            changeType: "ANALYSIS_UNSUPPORTED_CONSTRUCT",
+            changeId: "e".repeat(64),
+            ruleId: "SCH-001",
+            classification: "UNSUPPORTED",
+            severity: "INFO",
+            breaking: false,
+            path: "/products",
+            method: "GET",
+            operationKey: "GET /products",
+            affectedOperationKeys: ["GET /products"],
+            jsonPointer: "#/paths/~1products/get/responses/200",
+            summary: "An unsupported schema construct needs review.",
+            rationale: "The ruleset cannot evaluate the construct completely.",
+            field: "responses.200.schema.oneOf",
+            message: "Changed oneOf semantics require manual review.",
+          },
+        ],
+      })
+    );
+
+    await expect(report.validate()).resolves.toBeUndefined();
+    expect(report.changes[0].ruleId).toBe("SCH-001");
+    expect(report.summary.unsupported).toBe(1);
   });
 
   it("should enforce the maximum number of changes", async () => {
@@ -204,4 +267,78 @@ describe("DiffReport model", () => {
 
     expect(index).toBeDefined();
   });
+
+  it("should index canonical version references with the ruleset version", () => {
+    const index = DiffReport.schema.indexes().find(
+      ([keys]) =>
+        keys.baselineVersionId === 1 &&
+        keys.candidateVersionId === 1 &&
+        keys.rulesetVersion === 1
+    );
+
+    expect(index).toBeDefined();
+  });
+
+  it("should accept all five compatibility classifications and three statuses", async () => {
+    for (const classification of [
+      "BREAKING",
+      "POTENTIALLY_BREAKING",
+      "NON_BREAKING",
+      "INFORMATIONAL",
+      "UNSUPPORTED",
+    ]) {
+      const report = new DiffReport(
+        createValidReport({
+          summary: {
+            totalChanges: 1,
+            breakingChanges: classification === "BREAKING" ? 1 : 0,
+            nonBreakingChanges: classification === "NON_BREAKING" ? 1 : 0,
+            informationalChanges: classification === "INFORMATIONAL" ? 1 : 0,
+            breaking: classification === "BREAKING" ? 1 : 0,
+            potentiallyBreaking: classification === "POTENTIALLY_BREAKING" ? 1 : 0,
+            nonBreaking: classification === "NON_BREAKING" ? 1 : 0,
+            informational: classification === "INFORMATIONAL" ? 1 : 0,
+            unsupported: classification === "UNSUPPORTED" ? 1 : 0,
+          },
+          changes: [
+            {
+              category: "operation",
+              changeType: "CONTRACT_TEST",
+              changeId: "e".repeat(64),
+              classification,
+              severity: classification === "BREAKING" ? "BREAKING" : "INFO",
+              breaking: classification === "BREAKING",
+              path: "/products",
+              field: "operation",
+              message: "Contract classification validation.",
+              summary: "Contract classification validation.",
+              rationale: "Validation fixture.",
+            },
+          ],
+        })
+      );
+
+      await expect(report.validate()).resolves.toBeUndefined();
+    }
+
+    for (const analysisStatus of ["COMPLETE", "PARTIAL", "FAILED"]) {
+      const report = new DiffReport(
+        createValidReport({ analysisStatus })
+      );
+
+      await expect(report.validate()).resolves.toBeUndefined();
+    }
+  });
+
+  it("should persist the fixed direction and ruleset version", async () => {
+    const report = new DiffReport(createValidReport());
+
+    await report.validate();
+
+    expect(report.direction).toBe(
+      "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER"
+    );
+    expect(report.rulesetVersion).toBe("CG-COMPAT-1.1");
+  });
+
 });

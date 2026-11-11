@@ -1,4 +1,3 @@
-
 # ContractGuard Backend API Specification
 
 **Product:** ContractGuard  
@@ -329,6 +328,8 @@ Comparison creation request:
 }
 ```
 
+The previous `baselineSpecVersionId` and `candidateSpecVersionId` request names remain accepted as Phase 4 compatibility aliases. New clients should use the shorter `baselineVersionId` and `candidateVersionId` names.
+
 The server must verify:
 
 - Both versions exist.
@@ -410,6 +411,7 @@ Illustrative response structure:
         ],
         "jsonPointer": "#/components/schemas/Product/properties/price",
         "summary": "Response property type changed.",
+        "rationale": "The candidate no longer preserves the baseline response value type.",
         "testCoverage": {
           "totalLinkedTestCases": 2,
           "approvedCount": 1,

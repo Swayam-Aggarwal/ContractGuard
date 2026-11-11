@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 
 import {
@@ -54,16 +53,23 @@ const formatDate = (value) => {
 
 const AnalysisStatus = ({ status }) => {
   const complete = status === "COMPLETE";
+  const failed = status === "FAILED";
 
   return (
-    <span className={`comparison-status ${complete ? "is-complete" : "is-partial"}`}>
+    <span
+      className={`comparison-status ${complete ? "is-complete" : failed ? "is-failed" : "is-partial"}`}
+    >
       {complete ? (
         <ShieldCheck size={14} />
       ) : (
         <ShieldAlert size={14} />
       )}
 
-      {complete ? "Analysis complete" : status || "Partial analysis"}
+      {complete
+        ? "Analysis complete"
+        : failed
+          ? "Analysis failed"
+          : "Partial analysis"}
     </span>
   );
 };
@@ -72,22 +78,32 @@ const ReportSummary = ({ summary }) => (
   <div className="comparison-history-metrics">
     <span>
       <strong>{summary?.totalChanges ?? 0}</strong>
-      total changes
+      total
     </span>
 
     <span className="metric-breaking">
-      <strong>{summary?.breakingChanges ?? 0}</strong>
+      <strong>{summary?.breaking ?? summary?.breakingChanges ?? 0}</strong>
       breaking
     </span>
 
+    <span className="metric-potentially-breaking">
+      <strong>{summary?.potentiallyBreaking ?? 0}</strong>
+      potentially breaking
+    </span>
+
     <span className="metric-nonbreaking">
-      <strong>{summary?.nonBreakingChanges ?? 0}</strong>
+      <strong>{summary?.nonBreaking ?? summary?.nonBreakingChanges ?? 0}</strong>
       non-breaking
     </span>
 
     <span className="metric-info">
-      <strong>{summary?.informationalChanges ?? 0}</strong>
+      <strong>{summary?.informational ?? summary?.informationalChanges ?? 0}</strong>
       informational
+    </span>
+
+    <span className="metric-unsupported">
+      <strong>{summary?.unsupported ?? 0}</strong>
+      unsupported
     </span>
   </div>
 );
@@ -151,8 +167,8 @@ const ComparisonPage = () => {
     try {
       const result = await createMutation.mutateAsync({
         projectId,
-        baselineSpecVersionId: baselineId,
-        candidateSpecVersionId: candidateId,
+        baselineVersionId: baselineId,
+        candidateVersionId: candidateId,
       });
 
       navigate(

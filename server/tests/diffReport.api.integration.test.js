@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 import request from "supertest";
 
@@ -425,11 +424,32 @@ describe("Diff report API integration", () => {
     const report = response.body.data.diffReport;
 
     expect(report.analysisStatus).toBe("COMPLETE");
+    expect(report.direction).toBe(
+      "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER"
+    );
+    expect(report.rulesetVersion).toBe("CG-COMPAT-1.1");
+    expect(report.baselineVersionId).toBe(baseline.id);
+    expect(report.candidateVersionId).toBe(candidate.id);
+    expect(report.baselineSpecVersionId).toBe(baseline.id);
+    expect(report.candidateSpecVersionId).toBe(candidate.id);
 
     expect(report.summary).toMatchObject({
-      breakingChanges: 3,
+      breaking: 2,
+      potentiallyBreaking: 1,
+      nonBreaking: 1,
+      informational: 0,
+      unsupported: 0,
+      breakingChanges: 2,
       addedOperations: 1,
       removedOperations: 1,
+    });
+
+    expect(report.changes[0]).toMatchObject({
+      changeId: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      classification: expect.any(String),
+      summary: expect.any(String),
+      rationale: expect.any(String),
+      affectedOperationKeys: expect.any(Array),
     });
 
     expect(report.changes).toEqual(
@@ -441,7 +461,9 @@ describe("Diff report API integration", () => {
 
         expect.objectContaining({
           changeType: "RESPONSE_REMOVED",
-          severity: "BREAKING",
+          ruleId: "RES-011",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
         }),
 
         expect.objectContaining({
@@ -459,12 +481,33 @@ describe("Diff report API integration", () => {
     const stored = await DiffReport.findById(report.id).lean();
 
     expect(stored).not.toBeNull();
-    expect(stored.baselineSpecVersionId.toString()).toBe(
-      baseline.id
-    );
-    expect(stored.candidateSpecVersionId.toString()).toBe(
-      candidate.id
-    );
+    expect(stored.baselineVersionId.toString()).toBe(baseline.id);
+    expect(stored.candidateVersionId.toString()).toBe(candidate.id);
+
+    // New reports persist canonical names; legacy aliases are API-only here.
+    expect(stored.baselineSpecVersionId).toBeUndefined();
+    expect(stored.candidateSpecVersionId).toBeUndefined();
+  });
+
+  it("should accept the current baselineVersionId/candidateVersionId request contract", async () => {
+    const agent = await createAccount();
+    const { project, baseline, candidate } = await createVersionPair(agent);
+
+    const response = await agent
+      .post(`/api/v1/projects/${project.id}/diff-reports`)
+      .set("Origin", APP_ORIGIN)
+      .send({
+        baselineVersionId: baseline.id,
+        candidateVersionId: candidate.id,
+      })
+      .expect(201);
+
+    expect(response.body.data.diffReport).toMatchObject({
+      baselineVersionId: baseline.id,
+      candidateVersionId: candidate.id,
+      direction: "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER",
+      rulesetVersion: "CG-COMPAT-1.1",
+    });
   });
 
   it("should reuse an existing report for the same version pair", async () => {

@@ -1,4 +1,3 @@
-
 import { createHash } from "node:crypto";
 
 import AppError from "../utils/appError.js";
@@ -10,6 +9,11 @@ import {
 } from "../constants/openapi.js";
 
 import createOpenApiReferenceService from "./openapi-reference.service.js";
+
+import {
+  createOperationMatchKey,
+  normalizeOpenApiPath,
+} from "./openapi-path-normalization.service.js";
 
 import {
   encodeJsonPointer,
@@ -122,12 +126,21 @@ const getOperationMetadata = ({
   sourceName = null,
   callbackName = null,
   parentOperationKey = null,
+  parentOperationMatchKey = null,
 }) => {
+  const normalizedPath = kind === "path"
+    ? normalizeOpenApiPath(path)
+    : {
+        canonicalPath: path,
+        pathParameterNames: [],
+        pathTemplateIssues: [],
+      };
+
   const responseCodes = isRecord(operation.responses)
     ? Object.keys(operation.responses).sort()
     : [];
 
-  return {
+  const metadata = {
     operationKey: createOperationKey(method, path, {
       kind,
       sourcePointer,
@@ -166,6 +179,46 @@ const getOperationMetadata = ({
     callbackName,
     parentOperationKey,
   };
+
+  // Keep matching-only metadata out of the public API Explorer response while
+  // making it available to the compatibility engine and recursive callbacks.
+  Object.defineProperties(metadata, {
+    parentOperationMatchKey: {
+      value: parentOperationMatchKey,
+      enumerable: false,
+    },
+
+    canonicalPath: {
+      value: normalizedPath.canonicalPath,
+      enumerable: false,
+    },
+
+    pathParameterNames: {
+      value: normalizedPath.pathParameterNames,
+      enumerable: false,
+    },
+
+    pathTemplateIssues: {
+      value: normalizedPath.pathTemplateIssues,
+      enumerable: false,
+    },
+
+    operationMatchKey: {
+      value: createOperationMatchKey({
+        kind,
+        method,
+        path,
+        canonicalPath: normalizedPath.canonicalPath,
+        sourceName,
+        callbackName,
+        parentOperationKey,
+        parentOperationMatchKey,
+      }),
+      enumerable: false,
+    },
+  });
+
+  return metadata;
 };
 
 const resolvePathItem = (pathItem, pointer, references) => {
@@ -263,6 +316,7 @@ export const createOperationIndex = (document) => {
     sourceName = null,
     callbackName = null,
     parentOperationKey = null,
+    parentOperationMatchKey = null,
     callbackDepth = 0,
   }) => {
     const resolvedPathItem = resolvePathItem(
@@ -340,6 +394,7 @@ export const createOperationIndex = (document) => {
         sourceName,
         callbackName,
         parentOperationKey,
+        parentOperationMatchKey,
       });
 
       addOperation(metadata);
@@ -407,6 +462,7 @@ export const createOperationIndex = (document) => {
                 ? `${callbackName}.${name}`
                 : name,
               parentOperationKey: metadata.operationKey,
+              parentOperationMatchKey: metadata.operationMatchKey,
               callbackDepth: callbackDepth + 1,
             });
           }
@@ -452,6 +508,42 @@ export const createOperationIndex = (document) => {
           ? path
           : null,
       });
+    }
+  }
+
+  // OpenAPI path templates that differ only by parameter names are the same
+  // path. Preserve every operation, but attach a diagnostic so comparison
+  // cannot silently choose one of the conflicting declarations.
+  const canonicalPathGroups = new Map();
+
+  for (const operation of operations) {
+    if (operation.kind !== "path") continue;
+
+    const group =
+      canonicalPathGroups.get(operation.canonicalPath) ?? new Set();
+
+    group.add(operation.path);
+    canonicalPathGroups.set(operation.canonicalPath, group);
+  }
+
+  for (const [canonicalPath, originalPaths] of canonicalPathGroups) {
+    if (originalPaths.size < 2) continue;
+
+    const conflictingPaths = [...originalPaths].sort();
+
+    for (const operation of operations) {
+      if (
+        operation.kind === "path" &&
+        operation.canonicalPath === canonicalPath
+      ) {
+        operation.pathTemplateIssues.push({
+          code: "DUPLICATE_CANONICAL_PATH",
+          canonicalPath,
+          conflictingPaths,
+          message:
+            `The Paths Object contains templated paths that have the same hierarchy: ${conflictingPaths.join(", ")}.`,
+        });
+      }
     }
   }
 

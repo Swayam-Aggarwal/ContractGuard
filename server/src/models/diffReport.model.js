@@ -1,5 +1,6 @@
-
 import mongoose from "mongoose";
+
+const MAX_REPORT_CHANGES = 2000;
 
 const analysisWarningSchema = new mongoose.Schema(
   {
@@ -51,6 +52,42 @@ const changeSchema = new mongoose.Schema(
       immutable: true,
     },
 
+    changeId: {
+      type: String,
+      required: true,
+      match: /^[a-f0-9]{64}$/u,
+      immutable: true,
+    },
+
+    ruleId: {
+      type: String,
+      default: null,
+      maxlength: 20,
+      validate: {
+        validator: (value) =>
+          value === null ||
+          /^(?:OP|PAR|REQ|RES|SEC|SRV|SCH)-\d{3}$/u.test(value),
+
+        message:
+          "Rule ID must use a documented compatibility-rule prefix and number.",
+      },
+      immutable: true,
+    },
+
+    classification: {
+      type: String,
+      required: true,
+      enum: [
+        "BREAKING",
+        "POTENTIALLY_BREAKING",
+        "NON_BREAKING",
+        "INFORMATIONAL",
+        "UNSUPPORTED",
+      ],
+      immutable: true,
+    },
+
+    // Retained for existing clients while they migrate to classification.
     severity: {
       type: String,
       required: true,
@@ -71,9 +108,10 @@ const changeSchema = new mongoose.Schema(
       immutable: true,
     },
 
+    // Document-level findings may not belong to a particular API path.
     path: {
       type: String,
-      required: true,
+      default: null,
       maxlength: 1000,
       immutable: true,
     },
@@ -81,7 +119,39 @@ const changeSchema = new mongoose.Schema(
     operationKey: {
       type: String,
       default: null,
-      maxlength: 100,
+      maxlength: 2000,
+      immutable: true,
+    },
+
+    affectedOperationKeys: {
+      type: [
+        {
+          type: String,
+          maxlength: 2000,
+        },
+      ],
+      default: [],
+      immutable: true,
+    },
+
+    jsonPointer: {
+      type: String,
+      default: null,
+      maxlength: 2000,
+      immutable: true,
+    },
+
+    summary: {
+      type: String,
+      required: true,
+      maxlength: 2000,
+      immutable: true,
+    },
+
+    rationale: {
+      type: String,
+      required: true,
+      maxlength: 2000,
       immutable: true,
     },
 
@@ -165,6 +235,46 @@ const summarySchema = new mongoose.Schema(
       immutable: true,
     },
 
+    breaking: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      immutable: true,
+    },
+
+    potentiallyBreaking: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      immutable: true,
+    },
+
+    nonBreaking: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      immutable: true,
+    },
+
+    informational: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      immutable: true,
+    },
+
+    unsupported: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+      immutable: true,
+    },
+
     addedOperations: {
       type: Number,
       required: true,
@@ -211,17 +321,31 @@ const diffReportSchema = new mongoose.Schema(
       immutable: true,
     },
 
-    baselineSpecVersionId: {
+    // Canonical report-contract references.
+    baselineVersionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SpecVersion",
       required: true,
       immutable: true,
     },
 
-    candidateSpecVersionId: {
+    candidateVersionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SpecVersion",
       required: true,
+      immutable: true,
+    },
+
+    // Legacy Phase 4 references retained for historical compatibility.
+    baselineSpecVersionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SpecVersion",
+      immutable: true,
+    },
+
+    candidateSpecVersionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SpecVersion",
       immutable: true,
     },
 
@@ -256,7 +380,24 @@ const diffReportSchema = new mongoose.Schema(
     analyzerVersion: {
       type: String,
       required: true,
-      default: "1.0.0",
+      default: "2.0.2",
+      immutable: true,
+    },
+
+    direction: {
+      type: String,
+      required: true,
+      enum: ["BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER"],
+      default: "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER",
+      immutable: true,
+    },
+
+    rulesetVersion: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 40,
+      default: "CG-COMPAT-1.1",
       immutable: true,
     },
 
@@ -270,7 +411,7 @@ const diffReportSchema = new mongoose.Schema(
     analysisStatus: {
       type: String,
       required: true,
-      enum: ["COMPLETE", "PARTIAL"],
+      enum: ["COMPLETE", "PARTIAL", "FAILED"],
       default: "PARTIAL",
       immutable: true,
     },
@@ -285,8 +426,8 @@ const diffReportSchema = new mongoose.Schema(
       type: [changeSchema],
       default: [],
       validate: {
-        validator: (value) => value.length <= 2000,
-        message: "A maximum of 2000 changes is allowed.",
+        validator: (value) => value.length <= MAX_REPORT_CHANGES,
+        message: `A maximum of ${MAX_REPORT_CHANGES} changes is allowed.`,
       },
       immutable: true,
     },
@@ -314,6 +455,22 @@ const diffReportSchema = new mongoose.Schema(
   }
 );
 
+// Reject oversized reports before Mongoose validates individual
+// change subdocuments. This avoids unnecessary nested validation.
+diffReportSchema.pre("validate", function () {
+  if (
+    Array.isArray(this.changes) &&
+    this.changes.length > MAX_REPORT_CHANGES
+  ) {
+    throw this.invalidate(
+      "changes",
+      `A maximum of ${MAX_REPORT_CHANGES} changes is allowed.`,
+      this.changes.length,
+      "user defined"
+    );
+  }
+});
+
 diffReportSchema.index(
   {
     projectId: 1,
@@ -335,6 +492,18 @@ diffReportSchema.index(
   }
 );
 
+diffReportSchema.index(
+  {
+    baselineVersionId: 1,
+    candidateVersionId: 1,
+    rulesetVersion: 1,
+  },
+  {
+    name: "idx_diffreports_version_pair_ruleset",
+  }
+);
+
+// Retained for compatibility with older Phase 4 report queries.
 diffReportSchema.index(
   {
     baselineSpecVersionId: 1,

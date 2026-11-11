@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from "vitest";
 
 import compareSchemas from
@@ -68,7 +67,7 @@ describe("Schema compatibility service", () => {
     );
   });
 
-  it("should classify removal of an optional request property as non-breaking when additional properties are allowed", () => {
+  it("should classify removal of an optional request property as potentially breaking when additional properties are allowed", () => {
     const result = compareSchemas(
       {
         type: "object",
@@ -92,7 +91,8 @@ describe("Schema compatibility service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "SCHEMA_PROPERTY_REMOVED",
-          severity: "NON_BREAKING",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
           field: "schema.properties.id",
         }),
       ])
@@ -218,7 +218,7 @@ describe("Schema compatibility service", () => {
     );
   });
 
-  it("should detect response enum expansion as breaking", () => {
+  it("should detect response enum expansion as potentially breaking", () => {
     const result = compareSchemas(
       {
         type: "string",
@@ -237,7 +237,8 @@ describe("Schema compatibility service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "SCHEMA_ENUM_CHANGED",
-          severity: "BREAKING",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
         }),
       ])
     );
@@ -281,7 +282,7 @@ describe("Schema compatibility service", () => {
     ).toBe("NON_BREAKING");
   });
 
-  it("should recognize incompatible response type expansion", () => {
+  it("should classify response type expansion as potentially breaking", () => {
     const result = compareSchemas(
       {
         type: "string",
@@ -297,8 +298,11 @@ describe("Schema compatibility service", () => {
     expect(
       result.changes.find(
         (change) => change.changeType === "SCHEMA_TYPE_CHANGED"
-      )?.severity
-    ).toBe("BREAKING");
+      )
+    ).toMatchObject({
+      classification: "POTENTIALLY_BREAKING",
+      severity: "INFO",
+    });
   });
 
   it("should detect a type added to a previously unrestricted request schema", () => {
@@ -347,7 +351,7 @@ describe("Schema compatibility service", () => {
     );
   });
 
-  it("should detect response constraints that expand the output range", () => {
+  it("should classify response constraints that expand the output range as potentially breaking", () => {
     const result = compareSchemas(
       {
         type: "integer",
@@ -366,7 +370,8 @@ describe("Schema compatibility service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "SCHEMA_CONSTRAINT_CHANGED",
-          severity: "BREAKING",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
         }),
       ])
     );

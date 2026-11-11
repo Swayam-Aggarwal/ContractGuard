@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from "vitest";
 
 import createCompatibilityAnalysis from
@@ -41,6 +40,17 @@ describe("Compatibility analysis service", () => {
     );
 
     expect(result.analysisStatus).toBe("COMPLETE");
+    expect(result.direction).toBe(
+      "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER"
+    );
+    expect(result.rulesetVersion).toBe("CG-COMPAT-1.1");
+    expect(result.summary).toMatchObject({
+      breaking: 0,
+      potentiallyBreaking: 0,
+      nonBreaking: 0,
+      informational: 0,
+      unsupported: 0,
+    });
     expect(result.summary.totalChanges).toBe(0);
     expect(result.summary.breakingChanges).toBe(0);
     expect(result.summary.unchangedOperations).toBe(1);
@@ -62,6 +72,19 @@ describe("Compatibility analysis service", () => {
     );
 
     expect(result.summary.removedOperations).toBe(1);
+
+    const removedOperation = result.changes.find(
+      (change) => change.changeType === "OPERATION_REMOVED"
+    );
+
+    expect(removedOperation).toMatchObject({
+      changeId: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      ruleId: "OP-001",
+      classification: "BREAKING",
+      summary: expect.any(String),
+      rationale: expect.any(String),
+      affectedOperationKeys: expect.any(Array),
+    });
 
     expect(result.changes).toEqual(
       expect.arrayContaining([
@@ -127,7 +150,9 @@ describe("Compatibility analysis service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "OPERATION_ID_CHANGED",
-          severity: "BREAKING",
+          ruleId: "OP-005",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
           oldValue: "getProduct",
           newValue: "fetchProduct",
         }),
@@ -222,7 +247,9 @@ describe("Compatibility analysis service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "RESPONSE_REMOVED",
-          severity: "BREAKING",
+          ruleId: "RES-011",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
           field: "responses.404",
         }),
       ])

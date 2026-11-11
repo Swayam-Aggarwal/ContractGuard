@@ -1,4 +1,3 @@
-
 # Compatibility Rules and Analysis Semantics
 
 **Product:** ContractGuard  
@@ -293,6 +292,14 @@ If a relevant change depends on unsupported semantics:
 3. Explain which construct could not be evaluated.
 4. Set the overall report status to `PARTIAL`.
 5. Do not silently treat the change as compatible.
+
+### 10.1 Unsupported-analysis diagnostic
+
+| Diagnostic ID | Condition | Classification | Rationale |
+|---|---|---|---|
+| `SCH-001` | A relevant schema, reference, serialization, security, server, or parser construct cannot be evaluated completely by the supported v1 subset | `UNSUPPORTED` | The analyzer must expose uncertainty rather than silently assigning a compatibility result. |
+
+`SCH-001` is a diagnostic rule identifier. It does not claim that the underlying construct is always breaking; it records that the analyzer cannot prove compatibility. The finding must include the affected source location where available, a stable change ID, a summary, a rationale, and affected operation keys where known. Any report containing `SCH-001` must have `PARTIAL` analysis status.
 
 ## 11. Reference-resolution requirements
 

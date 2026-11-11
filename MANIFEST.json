@@ -1,10 +1,9 @@
-
 {
   "product": "ContractGuard",
   "manifestVersion": "1.0.0",
   "blueprintVersion": "1.1.0",
-  "status": "Planning and specification review",
-  "lastUpdated": "2026-11-07",
+  "status": "Active implementation — Phase 5 compatibility-engine core implemented; complete analyzer-fixture audit remains open",
+  "lastUpdated": "2026-11-11",
   "totalFiles": 17,
   "directories": [
     "docs",
@@ -14,7 +13,7 @@
     {
       "path": "README.md",
       "type": "documentation",
-      "purpose": "Project overview, scope, technology baseline, and documentation index"
+      "purpose": "Project overview, scope, technology baseline, implementation status, and documentation index"
     },
     {
       "path": ".env.example",
@@ -29,7 +28,7 @@
     {
       "path": "MANIFEST.json",
       "type": "manifest",
-      "purpose": "Documentation package inventory and version metadata"
+      "purpose": "Documentation package inventory, technology baseline, and implementation status"
     }
   ],
   "documentation": [
@@ -65,17 +64,29 @@
   "technologyBaseline": {
     "language": "JavaScript",
     "runtime": "Node.js 24.x",
-    "frontend": "React",
-    "buildTool": "Vite",
-    "backend": "Express 5",
+    "frontend": "React 19.x",
+    "buildTool": "Vite 8.x",
+    "frontendRouter": "React Router 8.x",
+    "styling": "Tailwind CSS 4.x",
+    "serverState": "TanStack Query 5.x",
+    "forms": "React Hook Form 7.x",
+    "backend": "Express 5.x",
     "database": "MongoDB",
-    "odm": "Mongoose",
+    "odm": "Mongoose 9.x",
+    "passwordHashing": "bcrypt 6.x",
+    "inputValidation": "Zod 4.x",
+    "openApiParser": "@scalar/openapi-parser",
+    "schemaValidation": "Ajv 8.x",
+    "yamlParser": "yaml",
+    "unitTesting": "Vitest",
+    "apiIntegrationTesting": "Supertest",
+    "e2eTesting": "Playwright",
     "compatibilityRuleset": "CG-COMPAT-1.1"
   },
   "implementationStatus": {
-    "documentation": "Under review",
-    "applicationSourceCode": "Not started",
-    "compatibilityEngine": "Not implemented",
+    "documentation": "Core documentation established; Phase 5 verification evidence recorded.",
+    "applicationSourceCode": "Phase 5 compatibility-engine core implemented and integrated; subsequent v1 phases remain pending.",
+    "compatibilityEngine": "CG-COMPAT-1.1 core implemented and integrated. The backend suite previously passed 37 test files and 426 tests on 2026-11-11, before the latest report-contract and operation-matching changes; revalidation is required. All 52 documented rule IDs have mapping and finding-contract fixtures; paired baseline/candidate analyzer fixtures remain a verification item.",
     "regressionRunner": "Not implemented",
     "aiIntegration": "Not implemented"
   }

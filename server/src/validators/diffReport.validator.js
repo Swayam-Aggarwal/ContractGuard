@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 const objectIdSchema = z
@@ -8,12 +7,34 @@ const objectIdSchema = z
     "ID must be a valid MongoDB ObjectId."
   );
 
-export const createDiffReportSchema = z
+const currentComparisonInputSchema = z
+  .object({
+    baselineVersionId: objectIdSchema,
+    candidateVersionId: objectIdSchema,
+  })
+  .strict();
+
+// Phase 4 clients used the longer names. Keep accepting them during the
+// transition while the public comparison contract uses baselineVersionId.
+const legacyComparisonInputSchema = z
   .object({
     baselineSpecVersionId: objectIdSchema,
     candidateSpecVersionId: objectIdSchema,
   })
-  .strict()
+  .strict();
+
+export const createDiffReportSchema = z
+  .union([
+    currentComparisonInputSchema,
+    legacyComparisonInputSchema,
+  ])
+  .transform((value) => ({
+    baselineSpecVersionId:
+      value.baselineVersionId ?? value.baselineSpecVersionId,
+
+    candidateSpecVersionId:
+      value.candidateVersionId ?? value.candidateSpecVersionId,
+  }))
   .refine(
     (value) =>
       value.baselineSpecVersionId.toLowerCase() !==
@@ -21,7 +42,8 @@ export const createDiffReportSchema = z
     {
       message:
         "Baseline and candidate must be different specification versions.",
-      path: ["candidateSpecVersionId"],
+
+      path: ["candidateVersionId"],
     }
   );
 

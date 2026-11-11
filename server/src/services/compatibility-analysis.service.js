@@ -1,8 +1,19 @@
-
 import AppError from "../utils/appError.js";
 import createOperationIndex from "./openapi-operation-index.service.js";
+
+import {
+  matchOpenApiOperations,
+} from "./openapi-path-normalization.service.js";
+
 import createOpenApiReferenceService from "./openapi-reference.service.js";
 import compareSchemas from "./schema-compatibility.service.js";
+
+import {
+  COMPATIBILITY_DIRECTION,
+  COMPATIBILITY_RULESET_VERSION,
+  createClassificationSummary,
+  createFindingContract,
+} from "./compatibility-report-contract.js";
 
 const MAX_CHANGES = 2000;
 const MAX_WARNINGS = 100;
@@ -87,17 +98,20 @@ const compareCompatibility = (
 
   const changes = [];
   const warnings = [];
+  const warningMetadata = new Map();
 
   let omittedWarnings = 0;
   let addedOperations = 0;
   let removedOperations = 0;
   let unchangedOperations = 0;
 
-  const addWarning = (field, message) => {
+  const addWarning = (field, message, metadata = {}) => {
     const normalized = {
       field: String(field || "document").slice(0, 500),
       message: String(message).slice(0, 1000),
     };
+
+    const key = `${normalized.field}\u0000${normalized.message}`;
 
     if (
       warnings.some(
@@ -106,6 +120,10 @@ const compareCompatibility = (
           item.message === normalized.message
       )
     ) {
+      if (metadata && Object.keys(metadata).length > 0) {
+        const existing = warningMetadata.get(key) ?? {};
+        warningMetadata.set(key, { ...existing, ...metadata });
+      }
       return;
     }
 
@@ -115,6 +133,10 @@ const compareCompatibility = (
     }
 
     warnings.push(normalized);
+
+    if (metadata && Object.keys(metadata).length > 0) {
+      warningMetadata.set(key, metadata);
+    }
   };
 
   const importWarnings = (items, side, source) => {
@@ -144,7 +166,7 @@ const compareCompatibility = (
       );
     }
 
-    changes.push({
+    const legacyChange = {
       category: change.category,
       changeType: change.changeType,
       severity: change.severity,
@@ -158,7 +180,31 @@ const compareCompatibility = (
       newValue: change.newValue ?? null,
       baselinePointer: change.baselinePointer ?? null,
       candidatePointer: change.candidatePointer ?? null,
-    });
+      ...(change.ruleId ? { ruleId: change.ruleId } : {}),
+      ...(change.classification
+        ? { classification: change.classification }
+        : {}),
+      ...(change.jsonPointer
+        ? { jsonPointer: change.jsonPointer }
+        : /^components\.|^security\b|^servers\b|^openapi\b|^info\b/u.test(
+              String(change.field || "")
+            )
+          ? {
+              jsonPointer: `#/${String(change.field)
+                .replace(/^#\/?/u, "")
+                .split(".")
+                .map((segment) => segment.replace(/~/g, "~0").replace(/\//g, "~1"))
+                .join("/")}`,
+            }
+          : {}),
+      ...(change.affectedOperationKeys
+        ? { affectedOperationKeys: change.affectedOperationKeys }
+        : {}),
+      ...(change.summary ? { summary: change.summary } : {}),
+      ...(change.rationale ? { rationale: change.rationale } : {}),
+    };
+
+    changes.push(createFindingContract(legacyChange));
   };
 
   const resolveObject = (value, references, document, field) => {
@@ -308,7 +354,13 @@ const compareCompatibility = (
     });
 
     for (const warning of result.warnings) {
-      addWarning(warning.field, warning.message);
+      addWarning(warning.field, warning.message, {
+        path: context.path ?? null,
+        method: context.method ?? null,
+        operationKey: context.operationKey ?? null,
+        baselinePointer: context.baselinePointer ?? null,
+        candidatePointer: context.candidatePointer ?? null,
+      });
     }
 
     for (const change of result.changes) {
@@ -342,12 +394,25 @@ const compareCompatibility = (
 
       const covered = mediaTypeCoveredBy(mediaType, newTypes);
 
+      const mediaTypeRemovalClassification = direction === "request"
+        ? oldNames.length === 1
+          ? "BREAKING"
+          : "POTENTIALLY_BREAKING"
+        : "POTENTIALLY_BREAKING";
+
       addChange({
         ...context,
         changeType: covered
           ? "MEDIA_TYPE_COVERAGE_CHANGED"
           : "MEDIA_TYPE_REMOVED",
-        severity: covered ? "INFO" : "BREAKING",
+        classification: covered
+          ? "UNSUPPORTED"
+          : mediaTypeRemovalClassification,
+        severity: covered
+          ? "INFO"
+          : mediaTypeRemovalClassification === "BREAKING"
+            ? "BREAKING"
+            : "INFO",
         field: `${context.field}.${mediaType}`,
         message: covered
           ? `The ${mediaType} media type is covered by a broader candidate media range; verify content negotiation and schema semantics.`
@@ -452,8 +517,6 @@ const compareCompatibility = (
   };
 
   const getEffectiveParameters = (operation) => {
-    const result = new Map();
-
     const references = operation.side === "baseline"
       ? baselineRefs
       : candidateRefs;
@@ -478,8 +541,12 @@ const compareCompatibility = (
         "The operation details could not be loaded completely."
       );
 
-      return result;
+      return new Map();
     }
+
+    // First apply OpenAPI's name+location override semantics. Only after
+    // resolving those declarations do path parameters receive positional keys.
+    const declaredParameters = new Map();
 
     const addParameters = (parameters, override) => {
       if (!Array.isArray(parameters)) return;
@@ -509,16 +576,58 @@ const compareCompatibility = (
           ? parameter.name.toLowerCase()
           : parameter.name;
 
-        const identity = `${parameter.in}\u0000${name}`;
+        const declaredIdentity = `${parameter.in}\u0000${name}`;
 
-        if (!result.has(identity) || override) {
-          result.set(identity, normalizeParameter(parameter));
+        if (!declaredParameters.has(declaredIdentity) || override) {
+          declaredParameters.set(
+            declaredIdentity,
+            normalizeParameter(parameter)
+          );
         }
       }
     };
 
     addParameters(pathItem.parameters, false);
     addParameters(operationObject.parameters, true);
+
+    const result = new Map();
+    const pathParameterNames = operation.metadata.pathParameterNames ?? [];
+
+    for (const parameter of declaredParameters.values()) {
+      let identity;
+
+      if (parameter.in === "path") {
+        const position = pathParameterNames.indexOf(parameter.name);
+
+        if (position === -1) {
+          addWarning(
+            operation.metadata.sourcePointer,
+            `Path parameter '${parameter.name}' is not present in the indexed path template.`
+          );
+
+          identity = `path-unmatched\u0000${parameter.name}`;
+        } else {
+          identity = `path-position\u0000${position}`;
+        }
+      } else {
+        const name = parameter.in === "header"
+          ? parameter.name.toLowerCase()
+          : parameter.name;
+
+        identity = `${parameter.in}\u0000${name}`;
+      }
+
+      if (result.has(identity)) {
+        addWarning(
+          operation.metadata.sourcePointer,
+          `More than one effective parameter maps to '${identity}'. The parameter comparison may be incomplete.`
+        );
+
+        identity = `${identity}\u0000${parameter.name}`;
+      }
+
+      result.set(identity, parameter);
+    }
 
     return result;
   };
@@ -538,7 +647,60 @@ const compareCompatibility = (
       metadata: newMetadata,
     });
 
+    const locationChangedOldIdentities = new Set();
+    const locationChangedNewIdentities = new Set();
+
+    // A same-name parameter moved to another location is one explicit
+    // breaking change (PAR-012), not an unrelated removal plus addition.
+    for (const [oldIdentity, oldParameter] of oldParameters) {
+      if (newParameters.has(oldIdentity)) continue;
+
+      const possibleMatches = [...newParameters.entries()].filter(
+        ([newIdentity, candidate]) => {
+          if (oldParameters.has(newIdentity)) return false;
+          if (candidate.in === oldParameter.in) return false;
+
+          const headerNameComparison =
+            oldParameter.in === "header" || candidate.in === "header";
+
+          const oldName = headerNameComparison
+            ? oldParameter.name.toLowerCase()
+            : oldParameter.name;
+
+          const candidateName = headerNameComparison
+            ? candidate.name.toLowerCase()
+            : candidate.name;
+
+          return candidateName === oldName;
+        }
+      );
+
+      if (possibleMatches.length !== 1) continue;
+
+      const [newIdentity, newParameter] = possibleMatches[0];
+
+      if (locationChangedNewIdentities.has(newIdentity)) continue;
+
+      locationChangedOldIdentities.add(oldIdentity);
+      locationChangedNewIdentities.add(newIdentity);
+
+      addChange({
+        ...context,
+        category: "parameter",
+        changeType: "PARAMETER_LOCATION_CHANGED",
+        ruleId: "PAR-012",
+        classification: "BREAKING",
+        severity: "BREAKING",
+        field: `parameters.${oldParameter.name}.in`,
+        message: `Parameter ${oldParameter.name} moved from ${oldParameter.in} to ${newParameter.in}.`,
+        oldValue: oldParameter.in,
+        newValue: newParameter.in,
+      });
+    }
+
     for (const [identity, oldParameter] of oldParameters) {
+      if (locationChangedOldIdentities.has(identity)) continue;
+
       const field =
         `parameters.${oldParameter.in}.${oldParameter.name}`;
 
@@ -557,6 +719,34 @@ const compareCompatibility = (
       }
 
       const newParameter = newParameters.get(identity);
+
+      const documentationKeys = ["description", "example", "examples"];
+      const oldDocumentation = Object.fromEntries(
+        documentationKeys
+          .filter((key) => Object.hasOwn(oldParameter, key))
+          .map((key) => [key, oldParameter[key]])
+      );
+      const newDocumentation = Object.fromEntries(
+        documentationKeys
+          .filter((key) => Object.hasOwn(newParameter, key))
+          .map((key) => [key, newParameter[key]])
+      );
+
+      if (
+        stableSerialize(oldDocumentation) !==
+        stableSerialize(newDocumentation)
+      ) {
+        addChange({
+          ...context,
+          category: "parameter",
+          changeType: "PARAMETER_DOCUMENTATION_CHANGED",
+          severity: "INFO",
+          field: `${field}.documentation`,
+          message: `The description or examples for parameter ${oldParameter.name} changed.`,
+          oldValue: oldDocumentation,
+          newValue: newDocumentation,
+        });
+      }
 
       if (
         oldParameter.required !== true &&
@@ -667,7 +857,10 @@ const compareCompatibility = (
     }
 
     for (const [identity, parameter] of newParameters) {
-      if (oldParameters.has(identity)) continue;
+      if (
+        oldParameters.has(identity) ||
+        locationChangedNewIdentities.has(identity)
+      ) continue;
 
       const required = parameter.required === true;
 
@@ -840,6 +1033,19 @@ const compareCompatibility = (
 
       if (!isRecord(oldResponse) || !isRecord(newResponse)) continue;
 
+      if ((oldResponse.description ?? "") !== (newResponse.description ?? "")) {
+        addChange({
+          ...context,
+          category: "response",
+          changeType: "RESPONSE_DOCUMENTATION_CHANGED",
+          severity: "INFO",
+          field: `responses.${status}.description`,
+          message: `The description for response ${status} changed.`,
+          oldValue: oldResponse.description ?? null,
+          newValue: newResponse.description ?? null,
+        });
+      }
+
       compareContent(
         oldResponse.content,
         newResponse.content,
@@ -995,8 +1201,11 @@ const compareCompatibility = (
 
   const compareOperation = (
     oldMetadata,
-    newMetadata
+    newMetadata,
+    matchType = "CANONICAL_IDENTITY"
   ) => {
+    void matchType;
+
     const changesBefore = changes.length;
     const warningsBefore = warnings.length;
 
@@ -1070,23 +1279,107 @@ const compareCompatibility = (
 
     if (
       oldOperation.summary !== newOperation.summary ||
-      oldOperation.description !== newOperation.description
+      oldOperation.description !== newOperation.description ||
+      stableSerialize(oldOperation.tags ?? []) !==
+        stableSerialize(newOperation.tags ?? [])
     ) {
       addChange({
         ...context,
         category: "metadata",
         changeType: "OPERATION_DOCUMENTATION_CHANGED",
+        ruleId: "OP-006",
+        classification: "INFORMATIONAL",
         severity: "INFO",
         field: "documentation",
-        message: "The operation documentation changed.",
+        message: "The operation summary, description, or tags changed.",
         oldValue: {
           summary: oldOperation.summary ?? null,
           description: oldOperation.description ?? null,
+          tags: oldOperation.tags ?? [],
         },
         newValue: {
           summary: newOperation.summary ?? null,
           description: newOperation.description ?? null,
+          tags: newOperation.tags ?? [],
         },
+      });
+    }
+
+    // Match path parameters by position after canonical path matching.
+    // The original parameter names remain available for the OP-004 finding.
+    if (
+      oldMetadata.kind === "path" &&
+      newMetadata.kind === "path" &&
+      oldMetadata.canonicalPath === newMetadata.canonicalPath
+    ) {
+      const oldPathParameterNames =
+        oldMetadata.pathParameterNames ?? [];
+
+      const newPathParameterNames =
+        newMetadata.pathParameterNames ?? [];
+
+      const parameterCount = Math.min(
+        oldPathParameterNames.length,
+        newPathParameterNames.length
+      );
+
+      for (let index = 0; index < parameterCount; index += 1) {
+        const oldName = oldPathParameterNames[index];
+        const newName = newPathParameterNames[index];
+
+        if (oldName === newName) continue;
+
+        addChange({
+          ...context,
+          category: "operation",
+          changeType: "PATH_PARAMETER_RENAMED",
+          ruleId: "OP-004",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
+          field: `pathParameters[${index}].name`,
+          message: `Path parameter '${oldName}' was renamed to '${newName}'. The route shape is unchanged, but generated clients and parameter bindings may be affected.`,
+          oldValue: oldName,
+          newValue: newName,
+        });
+      }
+    }
+
+    // A unique operationId can identify an operation whose static path changed.
+    if (
+      oldMetadata.kind === "path" &&
+      newMetadata.kind === "path" &&
+      oldMetadata.canonicalPath !== newMetadata.canonicalPath
+    ) {
+      addChange({
+        ...context,
+        category: "operation",
+        changeType: "OPERATION_PATH_CHANGED",
+        ruleId: "OP-003",
+        classification: "BREAKING",
+        severity: "BREAKING",
+        field: "path",
+        message: `The operation path changed from '${oldMetadata.path}' to '${newMetadata.path}'.`,
+        oldValue: oldMetadata.path,
+        newValue: newMetadata.path,
+      });
+    }
+
+    if (
+      oldMetadata.kind === "path" &&
+      newMetadata.kind === "path" &&
+      oldMetadata.method !== newMetadata.method
+    ) {
+      addChange({
+        ...context,
+        category: "operation",
+        changeType: "OPERATION_METHOD_CHANGED",
+        ruleId: "OP-008",
+        classification: "BREAKING",
+        severity: "BREAKING",
+        field: "method",
+        message: `The operation method changed from '${oldMetadata.method}' to '${newMetadata.method}'.`,
+        oldValue: oldMetadata.method,
+        newValue: newMetadata.method,
       });
     }
 
@@ -1176,83 +1469,74 @@ const compareCompatibility = (
     }
   };
 
-  const operationIdentity = (operation) =>
-    operation.kind === "callback"
-      ? [
-          "callback",
-          operation.parentOperationKey,
-          operation.callbackName,
-          operation.method,
-          operation.path,
-        ].join("\u0000")
-      : [
-          operation.kind,
-          operation.method,
-          operation.path,
-        ].join("\u0000");
+  const baselineOperations = createOperationIndex(baselineDocument);
+  const candidateOperations = createOperationIndex(candidateDocument);
 
-  const operationMap = (operations) => {
-    const result = new Map();
-
+  const reportIndexIssues = (operations, side) => {
     for (const operation of operations) {
-      const identity = operationIdentity(operation);
-
-      if (result.has(identity)) {
+      for (const issue of operation.pathTemplateIssues ?? []) {
         addWarning(
-          operation.sourcePointer,
-          "Multiple operations share an identity and could not be matched unambiguously."
+          `${side}.${operation.sourcePointer}`,
+          issue.message
         );
-      } else {
-        result.set(identity, operation);
       }
     }
-
-    return result;
   };
 
-  const baselineOperations = operationMap(
-    createOperationIndex(baselineDocument)
+  reportIndexIssues(baselineOperations, "baseline");
+  reportIndexIssues(candidateOperations, "candidate");
+
+  const operationMatching = matchOpenApiOperations(
+    baselineOperations,
+    candidateOperations
   );
 
-  const candidateOperations = operationMap(
-    createOperationIndex(candidateDocument)
-  );
-
-  for (const [identity, oldOperation] of baselineOperations) {
-    const newOperation = candidateOperations.get(identity);
-
-    if (!newOperation) {
-      removedOperations += 1;
-
-      addChange({
-        category: "operation",
-        changeType: "OPERATION_REMOVED",
-        severity: "BREAKING",
-        path: oldOperation.path,
-        method: oldOperation.method,
-        operationKey: oldOperation.operationKey,
-        field: "operation",
-        message: `The candidate removes ${oldOperation.method} ${oldOperation.path}.`,
-        oldValue: {
-          method: oldOperation.method,
-          path: oldOperation.path,
-          operationId: oldOperation.operationId,
-        },
-        baselinePointer: oldOperation.sourcePointer,
-      });
-    } else {
-      compareOperation(oldOperation, newOperation);
-    }
+  for (const diagnostic of operationMatching.diagnostics) {
+    addWarning(
+      `${diagnostic.field || "operations"}.${diagnostic.code.toLowerCase()}`,
+      diagnostic.message
+    );
   }
 
-  for (const [identity, newOperation] of candidateOperations) {
-    if (baselineOperations.has(identity)) continue;
+  for (const match of operationMatching.matches) {
+    compareOperation(
+      match.baseline,
+      match.candidate,
+      match.matchType
+    );
+  }
 
+  for (const oldOperation of operationMatching.unmatchedBaseline) {
+    removedOperations += 1;
+
+    addChange({
+      category: "operation",
+      changeType: "OPERATION_REMOVED",
+      ruleId: "OP-001",
+      classification: "BREAKING",
+      severity: "BREAKING",
+      path: oldOperation.path,
+      method: oldOperation.method,
+      operationKey: oldOperation.operationKey,
+      field: "operation",
+      message: `The candidate removes ${oldOperation.method} ${oldOperation.path}.`,
+      oldValue: {
+        method: oldOperation.method,
+        path: oldOperation.path,
+        operationId: oldOperation.operationId,
+      },
+      baselinePointer: oldOperation.sourcePointer,
+    });
+  }
+
+  for (const newOperation of operationMatching.unmatchedCandidate) {
     addedOperations += 1;
 
     addChange({
       category: "operation",
       changeType: "OPERATION_ADDED",
+      ruleId: "OP-002",
+      classification: "NON_BREAKING",
       severity: "NON_BREAKING",
       path: newOperation.path,
       method: newOperation.method,
@@ -1322,6 +1606,49 @@ const compareCompatibility = (
     );
   }
 
+  // Warnings identify portions of the contract whose behavior could not
+  // be fully analyzed. Preserve the warning for diagnostics and also expose
+  // a first-class UNSUPPORTED finding so reports cannot look fully compatible.
+  const unsupportedWarningKeys = new Set();
+
+  for (const warning of warnings) {
+    if (changes.length >= MAX_CHANGES) break;
+
+    const key = `${warning.field}\u0000${warning.message}`;
+    if (unsupportedWarningKeys.has(key)) continue;
+    unsupportedWarningKeys.add(key);
+
+    const metadata = warningMetadata.get(key) ?? {};
+    const isRequestEncodingWarning =
+      warning.field.startsWith("requestBody.content.") &&
+      /encoding changes require manual serialization compatibility review/iu.test(
+        warning.message
+      );
+
+    addChange({
+      ...metadata,
+      category: isRequestEncodingWarning ? "requestBody" : "metadata",
+      changeType: isRequestEncodingWarning
+        ? "REQUEST_ENCODING_CHANGED"
+        : "ANALYSIS_UNSUPPORTED_CONSTRUCT",
+      ruleId: isRequestEncodingWarning ? "REQ-012" : "SCH-001",
+      classification: isRequestEncodingWarning
+        ? "POTENTIALLY_BREAKING"
+        : "UNSUPPORTED",
+      severity: "INFO",
+      field: warning.field,
+      jsonPointer: warning.field.startsWith("#/")
+        ? warning.field
+        : null,
+      affectedOperationKeys: metadata.operationKey
+        ? [metadata.operationKey]
+        : [],
+      message: warning.message,
+      summary: `Compatibility analysis could not fully evaluate: ${warning.field}`,
+      rationale: "The v1 ruleset requires uncertain or unsupported constructs to remain visible and prevent a COMPLETE compatibility result.",
+    });
+  }
+
   if (omittedWarnings > 0) {
     const summaryWarning = {
       field: "analysis.warnings",
@@ -1335,22 +1662,22 @@ const compareCompatibility = (
     }
   }
 
-  const breakingChanges = changes.filter(
-    (item) => item.severity === "BREAKING"
-  ).length;
-
-  const nonBreakingChanges = changes.filter(
-    (item) => item.severity === "NON_BREAKING"
-  ).length;
-
-  const informationalChanges = changes.filter(
-    (item) => item.severity === "INFO"
-  ).length;
+  const classificationSummary = createClassificationSummary(changes);
+  const breakingChanges = classificationSummary.breaking;
+  const nonBreakingChanges = classificationSummary.nonBreaking;
+  const informationalChanges = classificationSummary.informational;
 
   return {
-    analysisStatus: warnings.length > 0 ? "PARTIAL" : "COMPLETE",
+    direction: COMPATIBILITY_DIRECTION,
+    rulesetVersion: COMPATIBILITY_RULESET_VERSION,
+
+    analysisStatus:
+      warnings.length > 0 || classificationSummary.unsupported > 0
+        ? "PARTIAL"
+        : "COMPLETE",
 
     summary: {
+      ...classificationSummary,
       totalChanges: changes.length,
       breakingChanges,
       nonBreakingChanges,

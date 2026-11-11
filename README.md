@@ -1,10 +1,9 @@
-
 # ContractGuard
 
 **API Change-Impact and Regression Testing Workbench**
 
 **Documentation version:** `v1.1`  
-**Project status:** Planning and specification review; application implementation not started.
+**Project status:** Active implementation — Phase 5 compatibility-engine core implemented and integrated; complete per-rule analyzer-fixture audit remains open.
 
 ## 1. Overview
 
@@ -87,26 +86,26 @@ Unsupported constructs must remain visible and produce partial-analysis outcomes
 | Server state | TanStack Query 5.x |
 | Forms | React Hook Form 7.x |
 | Backend | Express 5.x |
-| Database | MongoDB 8.x with Mongoose 9.x |
+| Database | MongoDB with Mongoose 9.x |
 | Input validation | Zod 4.x |
-| Password hashing | Argon2id |
+| Password hashing | bcrypt 6.x |
 | OpenAPI parsing | `@scalar/openapi-parser` |
 | Schema validation | Ajv 8.x with supported JSON Schema normalization |
 | YAML parsing | `yaml` |
 | Optional AI | Gemini Developer API through `@google/genai` |
-| Unit testing | Vitest |
+| Unit and integration testing | Vitest |
 | API integration testing | Supertest |
 | E2E testing | Playwright |
 | CI | GitHub Actions |
 
-Node.js 24 is retained as the initial development baseline to match the existing environment. It is now in Maintenance LTS; Node.js 26 is in Active LTS. Reassess the runtime choice before implementation and lock the selected version in the project configuration.
+Node.js 24.x is retained as the current development runtime baseline. Runtime upgrades should be evaluated deliberately rather than performed as part of unrelated dependency changes.
 
-Exact dependency versions must be verified and committed in the lockfile when implementation begins.
+Exact dependency versions are recorded in the respective package lockfiles.
 
 ## 6. Security boundaries
 
 - Every project and child resource is protected by server-side ownership checks.
-- Passwords are stored using Argon2id.
+- Passwords are hashed using bcrypt.
 - Authentication uses a JWT in an HttpOnly cookie.
 - Unsafe cookie-authenticated requests receive CSRF/origin protection.
 - Uploads are size-limited and parsed using safe configurations.
@@ -130,10 +129,10 @@ ContractGuard/
 ├── .env.example
 ├── MANIFEST.json
 │
-├── client/                       # Created during implementation
+├── client/
 │   └── src/
 │
-├── server/                       # Created during implementation
+├── server/
 │   └── src/
 │
 ├── docs/
@@ -183,17 +182,25 @@ The original requests for separate phase, tracker, and TODO documents are consol
 - [x] Compatibility rules documented.
 - [x] Security boundaries documented.
 - [x] Demo Store example specifications prepared.
-- [ ] Documentation consistency review completed.
-- [ ] Repository initialized for application development.
-- [ ] Frontend and backend skeleton implemented.
-- [ ] Compatibility engine implemented and tested.
+- [x] Repository and application structure established.
+- [x] Frontend and backend application foundations implemented.
+- [x] Core authentication and project workspace implemented.
+- [x] Core OpenAPI ingestion and API Explorer workflows implemented.
+- [x] Core comparison and report-history workflows implemented.
+- [x] Phase 5 compatibility-engine core implemented and integrated.
+- [x] Mapping and finding-contract fixtures cover all 52 documented rule IDs.
+- [ ] Revalidate the backend suite after the latest report-contract and operation-matching changes.
+- [ ] Complete paired baseline/candidate analyzer fixtures for every applicable rule.
+- [ ] Complete the full compatibility-engine acceptance audit.
 - [ ] Change-to-test traceability implemented.
 - [ ] Regression runner implemented.
 - [ ] Complete v1 workflows verified.
 
+**Phase 5 verification note — 11 November 2026:** The backend suite previously passed 37 test files and 426 tests. The mapping and finding-contract matrix covers all 52 documented rule IDs. That test result predates the latest report-contract and operation-matching updates, so the suite must be run again before treating the current source state as verified. Mapping fixtures are not a substitute for paired end-to-end analyzer fixtures.
+
 ## 10. Local development
 
-The intended development setup uses:
+The development setup uses:
 
 - Vite for the React frontend.
 - Express for the backend API.
@@ -205,7 +212,41 @@ In production, Express serves the built React application and API from the same 
 
 The application must remain usable without an AI provider key or paid service.
 
-Detailed implementation and startup instructions will be added when the application skeleton is created.
+### Backend
+
+From the `server` directory:
+
+```bash
+npm start
+```
+
+Run the backend test suite from the same directory:
+
+```bash
+npm test
+```
+
+### Frontend
+
+From the `client` directory:
+
+```bash
+npm run dev
+```
+
+Run frontend linting:
+
+```bash
+npm run lint
+```
+
+Create the production build:
+
+```bash
+npm run build
+```
+
+Environment-specific values belong in the root `.env` file. Do not commit secrets or real credentials.
 
 ## 11. Important limitations
 

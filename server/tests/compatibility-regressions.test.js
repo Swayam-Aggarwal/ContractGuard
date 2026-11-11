@@ -337,7 +337,9 @@ describe("Compatibility analyzer regressions", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "PARAMETER_SERIALIZATION_CHANGED",
-          severity: "BREAKING",
+          ruleId: "PAR-010",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
           field: "parameters.query.q.allowEmptyValue",
         }),
       ])
@@ -436,7 +438,9 @@ describe("Compatibility analyzer regressions", () => {
       expect.arrayContaining([
         expect.objectContaining({
           changeType: "MEDIA_TYPE_SCHEMA_REMOVED",
-          severity: "BREAKING",
+          ruleId: "RES-009",
+          classification: "POTENTIALLY_BREAKING",
+          severity: "INFO",
           field: "responses.200.content.application/json.schema",
         }),
       ])

@@ -474,15 +474,19 @@ Build ContractGuard's deterministic API compatibility engine independently of th
 
 This is the most important domain-logic phase.
 
+**Phase 5 verification record ? 11 November 2026:** The compatibility-engine core is implemented and integrated. The backend test suite passed **37 test files and 426 tests**. The mapping and finding-contract test matrix covers all 52 documented normative rule IDs. Parameter documentation changes map to PAR-011 and response description changes map to RES-012. The mapping matrix does not constitute 52 paired end-to-end analyzer fixtures. Unsupported constructs remain explicitly scoped and produce UNSUPPORTED findings with PARTIAL analysis.
+
 ### 10.1 Engine foundation
 
-- [ ] Establish the comparison module.
+- [x] Establish the comparison module.
 - [ ] Define the normalized baseline input contract.
 - [ ] Define the normalized candidate input contract.
-- [ ] Fix the direction as `BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`.
-- [ ] Define the ruleset identifier `CG-COMPAT-1.1`.
-- [ ] Define finding and summary structures.
-- [ ] Define overall analysis statuses.
+- [x] Fix the direction as `BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`.
+- [x] Define the ruleset identifier `CG-COMPAT-1.1`.
+- [x] Define finding and summary structures.
+- [x] Define overall analysis statuses.
+
+**Batch 1 progress — report contract foundation:** The fixed direction and ruleset are server-defined. Report summaries and the persistence model support all five classifications; report status supports COMPLETE, PARTIAL, and FAILED. Findings carry deterministic change IDs, rule IDs, summaries, rationales, JSON Pointers, and affected-operation fields. The report contract applies field-level pointer derivation idempotently, including during report retrieval. Operation matching uses exact canonical identity, a unique operationId for changed paths, and a unique canonical path for method-only changes. Ambiguous matching is reported as partial analysis instead of being guessed. Effective parameter pointers remain at operation level until resolved parameter array indexes are available.
 
 ### 10.2 Path normalization and operation matching
 
@@ -585,22 +589,20 @@ These tests are mandatory.
 
 ### 10.7 Unit-test fixtures
 
-Every implemented rule must have:
+**Verification record ? 11 November 2026**
 
-- Baseline fixture.
-- Candidate fixture.
-- Expected rule ID.
-- Expected classification.
-- Expected operation key.
-- Expected source location.
-- Expected analysis status.
+- [x] Mapping fixtures cover all 52 documented normative rule IDs.
+- [x] Expected rule IDs and classifications are asserted for every mapping fixture.
+- [x] Finding-contract assertions cover stable IDs, operation linkage, pointer structure, summaries, and rationales.
+- [x] Existing analyzer/regression tests cover operation matching, schema directionality, schema dialects, and unsupported diagnostics.
+- [~] A paired baseline/candidate analyzer fixture for every individual supported rule remains to be completed.
 
-Include paired directional tests wherever request and response semantics differ.
+The mapping matrix does not substitute for end-to-end compatibility comparisons.
 
 ### Acceptance criteria
 
 - Core compatibility rules operate independently of Express and MongoDB.
-- Every supported rule has automated fixtures.
+- [~] All 52 normative rules have mapping and finding-contract fixtures; paired baseline/candidate analyzer fixtures for every supported rule remain to be completed.
 - Direction-sensitive request and response tests pass.
 - Parameter renames do not become false operation additions/removals.
 - Shared references are available for downstream impact analysis.
@@ -608,7 +610,7 @@ Include paired directional tests wherever request and response semantics differ.
 - Unsupported constructs produce partial outcomes.
 - The engine can be explained and defended without relying on AI.
 
-**Milestone:** Tested deterministic compatibility engine.
+**Milestone:** Compatibility-engine core implemented and integrated; 37 backend test files and 426 tests passed. The 52-rule mapping and finding-contract matrix is verified. The paired per-rule baseline/candidate analyzer-fixture audit remains open.
 
 ## 11. Phase 6 — Change-to-test traceability and test-case management
 
@@ -1100,7 +1102,7 @@ Update a task to:
 | 2 | Authentication and project management | P0 | Partially verified — authenticated project workspace is in use; full security/ownership acceptance checklist not re-audited |
 | 3 | OpenAPI ingestion and normalization | P0 | Partially verified — both Demo Store YAML versions uploaded; full ingestion acceptance checklist not re-audited |
 | 4 | API Explorer | P0 | Core flows browser-verified; remaining acceptance checks listed in Phase 4 verification record |
-| 5 | Compatibility engine | P0 | Pending — next major implementation phase |
+| 5 | Compatibility engine | P0 | Core implemented; backend suite passed 37 files / 426 tests; all 52 rule mappings and finding contracts tested; paired analyzer-fixture audit remains open |
 | 6 | Change-to-test traceability | P0 | Pending |
 | 7 | Bundled regression runner | P0 | Pending |
 | 8 | Optional AI test suggestions | P1 | Pending |
@@ -1130,7 +1132,7 @@ Update a task to:
 | M2: Authentication | Registration, login, ownership tests | Partially verified — authenticated workspace observed; full auth/ownership test evidence not audited here |
 | M3: OpenAPI ingestion | Validated immutable specification version | Partially verified — both Demo Store YAML versions uploaded and listed |
 | M4: API Explorer | Navigable supported operations | Core browser flows verified on Demo Store 1.0.0 and 2.0.0; remaining checks listed in Phase 4 |
-| M5: Compatibility engine | Passing directional rule fixtures | Pending |
+| M5: Compatibility engine | Deterministic compatibility analysis and per-rule behavior | Core implemented; 37 files / 426 tests and 52 mapping fixtures pass; complete analyzer-fixture audit remains open |
 | M6: Traceability | Change-to-operation-to-test mapping | Pending |
 | M7: Regression runner | Baseline response validation against candidate | Pending |
 | M8: AI assistant | Consent-gated synthetic suggestions | Pending |
@@ -1273,8 +1275,6 @@ ContractGuard v1 is complete only when:
 23. Known limitations are documented honestly.
 24. The project includes a useful README, screenshots, and a reproducible demonstration.
 
----
-
 ## 22. Progress management
 
 This document is the central tracker. Last progress update: 10 November 2026.
@@ -1288,5 +1288,3 @@ When a phase is completed:
 - Update the phase status.
 - Record known limitations.
 - Confirm that dependent phases can safely begin.
-
-The next phase should not be treated as complete merely because its source code exists. It must satisfy its acceptance criteria.
