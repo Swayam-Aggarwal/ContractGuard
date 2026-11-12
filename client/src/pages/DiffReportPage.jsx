@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from "react";
 
 import {
@@ -488,6 +489,10 @@ const DiffReportPage = () => {
   const isComplete = report.analysisStatus === "COMPLETE";
   const isFailed = report.analysisStatus === "FAILED";
 
+  const regressionRunsPath =
+    `/projects/${encodeURIComponent(projectId)}` +
+    `/diff-reports/${encodeURIComponent(reportId)}/test-runs`;
+
   return (
     <section className="diff-report-page">
       <div className="comparison-breadcrumb">
@@ -538,7 +543,25 @@ const DiffReportPage = () => {
           </div>
         </div>
 
-        <AnalysisStatus status={report.analysisStatus} />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <Link
+            to={regressionRunsPath}
+            className="button button-primary"
+          >
+            <GitCompareArrows size={16} />
+            Regression runs
+          </Link>
+
+          <AnalysisStatus status={report.analysisStatus} />
+        </div>
       </header>
 
       {!isComplete && (

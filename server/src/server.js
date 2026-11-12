@@ -1,20 +1,24 @@
-
 import createApp from "./app.js";
 import connectDB from "./config/database.js";
 import parseEnv from "./config/env.js";
+import { recoverInterruptedTestRuns } from "./services/testRun.service.js";
 
 const startServer = async () => {
   try {
-    // Validate environment variables
     const config = parseEnv();
 
-    // Connect to MongoDB
     await connectDB(config.MONGODB_URI);
 
-    // Create the Express application
+    const interruptedCount = await recoverInterruptedTestRuns();
+
+    if (interruptedCount > 0) {
+      console.warn(
+        `Marked ${interruptedCount} unfinished regression run(s) as INTERRUPTED.`
+      );
+    }
+
     const app = createApp(config);
 
-    // Start Express
     const server = app.listen(config.PORT, () => {
       console.log(
         `ContractGuard API running at http://localhost:${config.PORT}`

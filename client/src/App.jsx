@@ -1,4 +1,3 @@
-
 import { lazy, Suspense } from "react";
 
 import {
@@ -17,7 +16,6 @@ import {
 
 import "./App.css";
 
-// Load page modules only when their routes are visited.
 const AuthPage = lazy(() => import("./pages/AuthPage.jsx"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const ProjectPage = lazy(() => import("./pages/ProjectPage.jsx"));
@@ -25,6 +23,7 @@ const ApiExplorerPage = lazy(() => import("./pages/ApiExplorerPage.jsx"));
 const ComparisonPage = lazy(() => import("./pages/ComparisonPage.jsx"));
 const DiffReportPage = lazy(() => import("./pages/DiffReportPage.jsx"));
 const TestCasesPage = lazy(() => import("./pages/TestCasesPage.jsx"));
+const TestRunsPage = lazy(() => import("./pages/TestRunsPage.jsx"));
 
 const RouteLoading = () => (
   <main
@@ -116,6 +115,11 @@ const App = () => {
             <Route
               path="/projects/:projectId/diff-reports/:reportId/coverage"
               element={<TestCasesPage />}
+            />
+
+            <Route
+              path="/projects/:projectId/diff-reports/:reportId/test-runs"
+              element={<TestRunsPage />}
             />
           </Route>
         </Route>

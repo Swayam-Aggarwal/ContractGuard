@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 import TestCase from "../models/testCase.model.js";
@@ -41,10 +40,14 @@ const isValidObjectId = (value) =>
   mongoose.isObjectIdOrHexString(value);
 
 const toObject = (value) => {
-  if (value instanceof Map) return Object.fromEntries(value.entries());
+  if (value instanceof Map) {
+    return Object.fromEntries(value.entries());
+  }
+
   if (value && typeof value.toObject === "function") {
     return value.toObject({ flattenMaps: true });
   }
+
   return value ?? {};
 };
 
@@ -66,8 +69,10 @@ export const toPublicTestCase = (record) => ({
     ...(record.assertions?.expectedStatus !== undefined
       ? { expectedStatus: record.assertions.expectedStatus }
       : {}),
-    propertyAssertions: record.assertions?.propertyAssertions ?? [],
-    requiredProperties: record.assertions?.requiredProperties ?? [],
+    propertyAssertions:
+      record.assertions?.propertyAssertions ?? [],
+    requiredProperties:
+      record.assertions?.requiredProperties ?? [],
   },
   generationMetadata: record.generationMetadata ?? null,
   createdAt: record.createdAt,
@@ -75,8 +80,14 @@ export const toPublicTestCase = (record) => ({
   approvedAt: record.approvedAt ?? null,
 });
 
-const getOwnedSpecification = async (ownerId, specVersionId) => {
-  if (!isValidObjectId(ownerId) || !isValidObjectId(specVersionId)) {
+const getOwnedSpecification = async (
+  ownerId,
+  specVersionId
+) => {
+  if (
+    !isValidObjectId(ownerId) ||
+    !isValidObjectId(specVersionId)
+  ) {
     throw createNotFoundError();
   }
 
@@ -86,20 +97,34 @@ const getOwnedSpecification = async (ownerId, specVersionId) => {
   );
 };
 
-const getOwnedTestCaseRecord = async (ownerId, testCaseId) => {
-  if (!isValidObjectId(ownerId) || !isValidObjectId(testCaseId)) {
+const getOwnedTestCaseRecord = async (
+  ownerId,
+  testCaseId
+) => {
+  if (
+    !isValidObjectId(ownerId) ||
+    !isValidObjectId(testCaseId)
+  ) {
     throw createNotFoundError();
   }
 
-  const record = await TestCase.findById(testCaseId).lean().exec();
-  if (!record) throw createNotFoundError();
+  const record = await TestCase.findById(testCaseId)
+    .lean()
+    .exec();
+
+  if (!record) {
+    throw createNotFoundError();
+  }
 
   const specification = await getOwnedSpecification(
     ownerId,
     record.specVersionId.toString()
   );
 
-  if (specification.projectId.toString() !== record.projectId.toString()) {
+  if (
+    specification.projectId.toString() !==
+    record.projectId.toString()
+  ) {
     throw createNotFoundError();
   }
 
@@ -112,11 +137,12 @@ const getOperationContext = async (
   operationKey,
   operationPath
 ) => {
-  const detail = await specificationExplorerService.getSpecificationOperation(
-    ownerId,
-    specification._id.toString(),
-    operationKey
-  );
+  const detail =
+    await specificationExplorerService.getSpecificationOperation(
+      ownerId,
+      specification._id.toString(),
+      operationKey
+    );
 
   const operation = detail.operation;
 
@@ -135,25 +161,43 @@ const getOperationContext = async (
 };
 
 const normalizeRequest = (request = {}) => ({
-  pathParams: { ...toObject(request.pathParams) },
-  queryParams: { ...toObject(request.queryParams) },
+  pathParams: {
+    ...toObject(request.pathParams),
+  },
+  queryParams: {
+    ...toObject(request.queryParams),
+  },
 });
 
-const validateRequestAgainstOperation = (request, operation) => {
+const validateRequestAgainstOperation = (
+  request,
+  operation
+) => {
   const normalized = normalizeRequest(request);
+
   const parameters = Array.isArray(operation.parameters)
     ? operation.parameters
     : [];
 
   const pathParameters = parameters.filter(
-    (parameter) => parameter?.in === "path" && typeof parameter.name === "string"
-  );
-  const queryParameters = parameters.filter(
-    (parameter) => parameter?.in === "query" && typeof parameter.name === "string"
+    (parameter) =>
+      parameter?.in === "path" &&
+      typeof parameter.name === "string"
   );
 
-  const pathNames = new Set(pathParameters.map((parameter) => parameter.name));
-  const queryNames = new Set(queryParameters.map((parameter) => parameter.name));
+  const queryParameters = parameters.filter(
+    (parameter) =>
+      parameter?.in === "query" &&
+      typeof parameter.name === "string"
+  );
+
+  const pathNames = new Set(
+    pathParameters.map((parameter) => parameter.name)
+  );
+
+  const queryNames = new Set(
+    queryParameters.map((parameter) => parameter.name)
+  );
 
   for (const key of Object.keys(normalized.pathParams)) {
     if (!pathNames.has(key)) {
@@ -175,7 +219,8 @@ const validateRequestAgainstOperation = (request, operation) => {
 
   if (
     Object.keys(normalized.pathParams).length +
-    Object.keys(normalized.queryParams).length > MAX_INPUTS
+      Object.keys(normalized.queryParams).length >
+    MAX_INPUTS
   ) {
     throw createValidationError(
       `At most ${MAX_INPUTS} parameter values may be stored in one test case.`,
@@ -186,7 +231,10 @@ const validateRequestAgainstOperation = (request, operation) => {
   for (const parameter of pathParameters) {
     const value = normalized.pathParams[parameter.name];
 
-    if (typeof value !== "string" || value.length === 0) {
+    if (
+      typeof value !== "string" ||
+      value.length === 0
+    ) {
       throw createValidationError(
         `A non-empty value is required for path parameter '${parameter.name}'.`,
         `request.pathParams.${parameter.name}`
@@ -201,7 +249,10 @@ const validateRequestAgainstOperation = (request, operation) => {
 
     if (
       typeof value !== "string" ||
-      (value.length === 0 && parameter.allowEmptyValue !== true)
+      (
+        value.length === 0 &&
+        parameter.allowEmptyValue !== true
+      )
     ) {
       throw createValidationError(
         `A value is required for query parameter '${parameter.name}'.`,
@@ -210,16 +261,34 @@ const validateRequestAgainstOperation = (request, operation) => {
     }
   }
 
-  for (const [location, values, definitions] of [
-    ["pathParams", normalized.pathParams, pathParameters],
-    ["queryParams", normalized.queryParams, queryParameters],
+  for (const [
+    location,
+    values,
+    definitions,
+  ] of [
+    [
+      "pathParams",
+      normalized.pathParams,
+      pathParameters,
+    ],
+    [
+      "queryParams",
+      normalized.queryParams,
+      queryParameters,
+    ],
   ]) {
     const definitionByName = new Map(
-      definitions.map((parameter) => [parameter.name, parameter])
+      definitions.map((parameter) => [
+        parameter.name,
+        parameter,
+      ])
     );
 
     for (const [name, value] of Object.entries(values)) {
-      if (typeof value !== "string" || value.length > 256) {
+      if (
+        typeof value !== "string" ||
+        value.length > 256
+      ) {
         throw createValidationError(
           "Parameter values must be strings of at most 256 characters.",
           `request.${location}.${name}`
@@ -227,7 +296,11 @@ const validateRequestAgainstOperation = (request, operation) => {
       }
 
       const definition = definitionByName.get(name);
-      if (value.length === 0 && definition?.allowEmptyValue !== true) {
+
+      if (
+        value.length === 0 &&
+        definition?.allowEmptyValue !== true
+      ) {
         throw createValidationError(
           `Parameter '${name}' does not allow an empty value.`,
           `request.${location}.${name}`
@@ -253,17 +326,29 @@ const validateForBaseline = async (
     operationPath
   );
 
-  return validateRequestAgainstOperation(request, operation);
+  return validateRequestAgainstOperation(
+    request,
+    operation
+  );
 };
 
-const listTestCases = async (ownerId, specVersionId) => {
-  const specification = await getOwnedSpecification(ownerId, specVersionId);
+const listTestCases = async (
+  ownerId,
+  specVersionId
+) => {
+  const specification = await getOwnedSpecification(
+    ownerId,
+    specVersionId
+  );
 
   const records = await TestCase.find({
     projectId: specification.projectId,
     specVersionId: specification._id,
   })
-    .sort({ createdAt: -1, _id: -1 })
+    .sort({
+      createdAt: -1,
+      _id: -1,
+    })
     .limit(500)
     .lean()
     .exec();
@@ -271,14 +356,25 @@ const listTestCases = async (ownerId, specVersionId) => {
   return records.map(toPublicTestCase);
 };
 
-const createTestCase = async (ownerId, specVersionId, input) => {
-  const specification = await getOwnedSpecification(ownerId, specVersionId);
+const createTestCase = async (
+  ownerId,
+  specVersionId,
+  input
+) => {
+  const specification = await getOwnedSpecification(
+    ownerId,
+    specVersionId
+  );
+
   const existingCount = await TestCase.countDocuments({
     projectId: specification.projectId,
     specVersionId: specification._id,
   }).exec();
 
-  if (existingCount >= MAX_TEST_CASES_PER_SPECIFICATION) {
+  if (
+    existingCount >=
+    MAX_TEST_CASES_PER_SPECIFICATION
+  ) {
     throw createTestCaseLimitError();
   }
 
@@ -306,13 +402,27 @@ const createTestCase = async (ownerId, specVersionId, input) => {
   return toPublicTestCase(record);
 };
 
-const getTestCase = async (ownerId, testCaseId) => {
-  const record = await getOwnedTestCaseRecord(ownerId, testCaseId);
+const getTestCase = async (
+  ownerId,
+  testCaseId
+) => {
+  const record = await getOwnedTestCaseRecord(
+    ownerId,
+    testCaseId
+  );
+
   return toPublicTestCase(record);
 };
 
-const updateTestCase = async (ownerId, testCaseId, updates) => {
-  const current = await getOwnedTestCaseRecord(ownerId, testCaseId);
+const updateTestCase = async (
+  ownerId,
+  testCaseId,
+  updates
+) => {
+  const current = await getOwnedTestCaseRecord(
+    ownerId,
+    testCaseId
+  );
 
   if (current.status !== "DRAFT") {
     throw createConflictError(
@@ -338,11 +448,15 @@ const updateTestCase = async (ownerId, testCaseId, updates) => {
   );
 
   const set = {
-    ...(updates.title !== undefined ? { title: updates.title } : {}),
+    ...(updates.title !== undefined
+      ? { title: updates.title }
+      : {}),
     ...(updates.description !== undefined
       ? { description: updates.description }
       : {}),
-    ...(updates.request !== undefined ? { request: validatedRequest } : {}),
+    ...(updates.request !== undefined
+      ? { request: validatedRequest }
+      : {}),
     ...(updates.assertions !== undefined
       ? { assertions: updates.assertions }
       : {}),
@@ -356,7 +470,10 @@ const updateTestCase = async (ownerId, testCaseId, updates) => {
       status: "DRAFT",
     },
     { $set: set },
-    { new: true, runValidators: true }
+    {
+      returnDocument: "after",
+      runValidators: true,
+    }
   )
     .lean()
     .exec();
@@ -370,11 +487,19 @@ const updateTestCase = async (ownerId, testCaseId, updates) => {
   return toPublicTestCase(updated);
 };
 
-const approveTestCase = async (ownerId, testCaseId) => {
-  const current = await getOwnedTestCaseRecord(ownerId, testCaseId);
+const approveTestCase = async (
+  ownerId,
+  testCaseId
+) => {
+  const current = await getOwnedTestCaseRecord(
+    ownerId,
+    testCaseId
+  );
 
   if (current.status !== "DRAFT") {
-    throw createConflictError("Only draft test cases can be approved.");
+    throw createConflictError(
+      "Only draft test cases can be approved."
+    );
   }
 
   const specification = await getOwnedSpecification(
@@ -391,6 +516,7 @@ const approveTestCase = async (ownerId, testCaseId) => {
   );
 
   const approvedAt = new Date();
+
   const updated = await TestCase.findOneAndUpdate(
     {
       _id: current._id,
@@ -405,7 +531,10 @@ const approveTestCase = async (ownerId, testCaseId) => {
         approvedAt,
       },
     },
-    { new: true, runValidators: true }
+    {
+      returnDocument: "after",
+      runValidators: true,
+    }
   )
     .lean()
     .exec();
@@ -419,8 +548,14 @@ const approveTestCase = async (ownerId, testCaseId) => {
   return toPublicTestCase(updated);
 };
 
-const archiveTestCase = async (ownerId, testCaseId) => {
-  const current = await getOwnedTestCaseRecord(ownerId, testCaseId);
+const archiveTestCase = async (
+  ownerId,
+  testCaseId
+) => {
+  const current = await getOwnedTestCaseRecord(
+    ownerId,
+    testCaseId
+  );
 
   if (current.status === "ARCHIVED") {
     return toPublicTestCase(current);
@@ -431,10 +566,19 @@ const archiveTestCase = async (ownerId, testCaseId) => {
       _id: current._id,
       projectId: current.projectId,
       specVersionId: current.specVersionId,
-      status: { $in: ["DRAFT", "APPROVED"] },
+      status: {
+        $in: ["DRAFT", "APPROVED"],
+      },
     },
-    { $set: { status: "ARCHIVED" } },
-    { new: true, runValidators: true }
+    {
+      $set: {
+        status: "ARCHIVED",
+      },
+    },
+    {
+      returnDocument: "after",
+      runValidators: true,
+    }
   )
     .lean()
     .exec();

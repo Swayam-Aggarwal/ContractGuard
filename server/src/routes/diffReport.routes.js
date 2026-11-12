@@ -1,8 +1,8 @@
-
 import express from "express";
 
 import createDiffReportController from
   "../controllers/diffReport.controller.js";
+import createTestRunRouter from "./testRun.routes.js";
 
 import requireProjectOwnership from
   "../middleware/requireProjectOwnership.middleware.js";
@@ -47,6 +47,11 @@ const createDiffReportRouter = () => {
     requireProjectOwnership,
     validateQuery(listDiffReportsQuerySchema),
     controller.listDiffReports
+  );
+
+  router.use(
+    "/:reportId/test-runs",
+    createTestRunRouter()
   );
 
   router.get(
