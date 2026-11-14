@@ -1,4 +1,7 @@
-import { lazy, Suspense } from "react";
+import {
+  lazy,
+  Suspense,
+} from "react";
 
 import {
   Link,
@@ -21,7 +24,11 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage.jsx"));
 const ProjectPage = lazy(() => import("./pages/ProjectPage.jsx"));
 const ApiExplorerPage = lazy(() => import("./pages/ApiExplorerPage.jsx"));
 const ComparisonPage = lazy(() => import("./pages/ComparisonPage.jsx"));
-const DiffReportPage = lazy(() => import("./pages/DiffReportPage.jsx"));
+
+const DiffReportPage = lazy(
+  () => import("./pages/DiffReportWithAiPage.jsx")
+);
+
 const TestCasesPage = lazy(() => import("./pages/TestCasesPage.jsx"));
 const TestRunsPage = lazy(() => import("./pages/TestRunsPage.jsx"));
 
@@ -45,7 +52,9 @@ const RouteLoading = () => (
 
 const NotFoundPage = () => (
   <main className="not-found-page">
-    <span className="eyebrow">404 · PAGE NOT FOUND</span>
+    <span className="eyebrow">
+      404 · PAGE NOT FOUND
+    </span>
 
     <h1>This page doesn't exist.</h1>
 
@@ -53,7 +62,10 @@ const NotFoundPage = () => (
       The page may have moved or the address may be incorrect.
     </p>
 
-    <Link to="/projects" className="button button-primary">
+    <Link
+      to="/projects"
+      className="button button-primary"
+    >
       Return to projects
     </Link>
   </main>

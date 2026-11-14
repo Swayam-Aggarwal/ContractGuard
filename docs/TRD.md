@@ -1,384 +1,339 @@
 # Technical Requirements Document (TRD)
 
-**Product:** ContractGuard
-**Version:** 1.1
-**Last Updated:** 11 November 2026
+**Product:** ContractGuard\
+**Document version:** 1.2\
+**Document status:** Technical implementation baseline\
+**Last updated:** 14 November 2026
+
+---
 
 ## 1. Technical Objectives
 
-ContractGuard is implemented as a JavaScript-based web application for API specification management, compatibility analysis, change-impact analysis, and test-case management.
+ContractGuard uses a JavaScript-based full-stack architecture designed to support API specification processing, deterministic compatibility analysis, change-to-test traceability, controlled regression execution, and optional AI-assisted test generation.
 
-The technical implementation must prioritize:
+The technical design prioritizes:
 
-- Clear separation of frontend and backend responsibilities.
-- Maintainable and modular application architecture.
-- Deterministic compatibility analysis.
-- Secure specification upload and processing.
-- Reliable database relationships and historical records.
-- Automated testing of critical functionality.
-- Bounded processing and execution limits.
-- Minimal unnecessary infrastructure.
+- Clear separation of responsibilities.
+- Deterministic and testable domain logic.
+- Explicit input validation.
+- Controlled processing of uploaded specifications.
+- Safe handling of persisted resources.
+- Server-side authorization and ownership enforcement.
+- Bounded regression execution.
+- Optional integration with external AI services.
 
-TypeScript, microservices, and distributed execution infrastructure are outside the current implementation scope.
+The application uses a React single-page frontend, an Express backend, and MongoDB persistence.
+
+The backend follows a modular-monolith structure. No distributed infrastructure is required for the current scope.
 
 ## 2. Technology Stack
 
-### 2.1 Frontend
+### 2.1 Runtime and Language
 
-| Technology | Purpose |
+| Component | Technology |
 |---|---|
-| React | User interface |
-| JavaScript | Application programming language |
+| Runtime | Node.js |
+| Language | JavaScript |
+| Module system | ECMAScript Modules |
+| Package manager | npm |
+| Frontend build system | Vite |
+
+The project uses JavaScript throughout the application. TypeScript is not part of the current implementation baseline.
+
+The runtime and dependency versions are maintained through the project package manifests and lockfiles.
+
+### 2.2 Frontend
+
+| Technology | Responsibility |
+|---|---|
+| React | Component-based user interface |
 | Vite | Development server and production build |
-| React Router | Client-side routing |
-| Tailwind CSS | Styling |
-| TanStack Query | Server-state management |
-| React Hook Form | Form management |
-| Zod | Client-side validation |
-| Lucide React | Icons |
+| React Router | Client-side navigation |
+| Tailwind CSS | Utility-based styling |
+| TanStack Query | Server-state fetching and caching |
+| React Hook Form | Form state and interaction |
+| Zod | Runtime input validation |
+| Lucide React | Interface icons |
 
-### 2.2 Backend
+Frontend responsibilities include:
 
-| Technology | Purpose |
+- Rendering application screens.
+- Managing local interaction state.
+- Navigating between application routes.
+- Submitting API requests.
+- Displaying server-generated compatibility findings.
+- Displaying test coverage and execution results.
+- Handling loading, empty, error, and partial states.
+- Obtaining explicit consent before eligible AI-provider submissions.
+
+The frontend is not authoritative for authorization, compatibility classification, or regression pass/fail decisions.
+
+### 2.3 Backend
+
+| Technology | Responsibility |
 |---|---|
-| Node.js | JavaScript runtime |
-| Express.js | HTTP server and API |
-| MongoDB | Persistent database |
-| Mongoose | Database modelling and queries |
+| Node.js | Backend runtime |
+| Express | HTTP server and API routing |
+| MongoDB | Persistent document database |
+| Mongoose | Data models and persistence |
 | bcrypt | Password hashing |
-| jsonwebtoken | JWT authentication |
-| cookie-parser | Cookie handling |
-| helmet | HTTP security headers |
+| JSON Web Token | Authentication token signing and verification |
+| cookie-parser | Authentication cookie handling |
+| Helmet | HTTP security headers |
 | express-rate-limit | Request rate limiting |
-| Multer | File uploads |
-| Zod | Request validation |
-| YAML | YAML parsing |
-| @scalar/openapi-parser | OpenAPI parsing |
-| Ajv | JSON Schema validation |
+| Multer | Multipart file upload handling |
+| Zod | Request and structured-output validation |
 
-### 2.3 Development and Testing Tools
+Backend responsibilities include:
 
-| Tool | Purpose |
+- Authentication and authorization.
+- Project and specification management.
+- File upload validation.
+- OpenAPI parsing and normalization.
+- Compatibility analysis.
+- Change-impact analysis.
+- Test-case management.
+- Regression execution.
+- AI provider integration.
+- Persistence and historical records.
+- Consistent error handling.
+
+### 2.4 Specification Processing and Validation
+
+| Technology | Responsibility |
 |---|---|
-| Git | Version control |
-| GitHub | Repository hosting |
-| Postman | API testing |
-| Vitest | Automated testing |
-| Supertest | HTTP integration testing |
-| ESLint | Code quality |
-| npm | Dependency management |
-| Visual Studio Code | Development environment |
+| `@scalar/openapi-parser` | OpenAPI parsing and document processing |
+| `yaml` | YAML document parsing |
+| Ajv | JSON Schema validation |
+| Zod | Runtime validation of application inputs and structured outputs |
 
-Exact dependency versions are maintained in the respective package manifests and lockfiles.
+The parser layer is isolated from compatibility rules. Parsed documents are processed into an application-controlled representation before compatibility analysis.
 
-Dependency upgrades must be deliberate and compatible with the existing application.
+Third-party parser behavior must not silently determine the application's compatibility policy.
+
+### 2.5 AI Integration
+
+| Component | Responsibility |
+|---|---|
+| Google Gemini Developer API | Generate structured test suggestions |
+| `@google/genai` | Official JavaScript SDK |
+| AI context service | Prepare trusted and sanitized operation context |
+| AI output validator | Validate generated suggestions |
+| Persistence service | Save valid suggestions as draft test cases |
+
+AI integration is optional. Core functionality must remain available when the API key is missing, the provider is unavailable, or quotas are exhausted.
+
+### 2.6 Testing
+
+| Technology | Responsibility |
+|---|---|
+| Vitest | Unit and integration testing |
+| Supertest | HTTP API integration testing |
+| ESLint | Frontend and code-quality checks |
+| Vite build | Production frontend build verification |
+
+Tests should cover services, validators, models, middleware, routes, and end-to-end API workflows where applicable.
 
 ## 3. Application Architecture
 
-ContractGuard follows a modular monolith architecture.
+### 3.1 Architecture Style
 
-The frontend and backend are maintained as separate application directories within one repository.
+ContractGuard uses a modular monolith.
 
-The backend contains domain-specific services responsible for specification processing, compatibility analysis, change impact, and test-case management.
+The repository contains separate frontend and backend application directories.
 
-### 3.1 High-level Architecture
-
-```text
-                 React Frontend
-                       |
-                       |
-                HTTP API Requests
-                       |
-                       v
-                Express Backend
-                       |
-                Routes and Middleware
-                       |
-                       v
-                   Controllers
-                       |
-                       v
-                    Services
-                       |
-          +------------+------------+
-          |            |            |
-          v            v            v
-     OpenAPI       Compatibility   Test Case
-     Processing      Analysis      Management
-          |            |            |
-          +------------+------------+
-                       |
-                       v
-                    Mongoose
-                       |
-                       v
-                    MongoDB
-```
+The backend runs as one Express application. Internal modules are separated by responsibility, but they are not independently deployed microservices.
 
 ### 3.2 Frontend Responsibilities
 
-The frontend handles:
+The React application manages:
 
-- User authentication interfaces.
-- Project management interfaces.
+- Authentication screens.
+- Projects workspace.
 - Specification upload and exploration.
-- Comparison report presentation.
-- Compatibility finding inspection.
-- Change-impact visualization.
-- Test-case creation and management.
-- Coverage information.
-- Loading, empty, success, and error states.
+- Comparison selection and result views.
+- Change-impact and coverage displays.
+- Test-case management.
+- AI suggestion preview and review.
+- Regression-run history and results.
 
-The frontend must not make authoritative authorization or compatibility-classification decisions.
+Server-state management is handled through TanStack Query.
+
+Local interface state is managed through React state and component-level hooks where appropriate.
 
 ### 3.3 Backend Responsibilities
 
-The backend handles:
+The backend is responsible for:
 
-- Authentication and authorization.
-- Request validation.
-- File upload and document parsing.
-- Specification normalization.
-- Compatibility analysis.
-- Operation matching.
-- Shared-schema impact analysis.
-- Test-case lifecycle management.
-- Coverage calculation.
-- Database persistence.
-- Security middleware and error handling.
+- Verifying authenticated requests.
+- Enforcing project ownership.
+- Validating request payloads.
+- Processing uploaded specifications.
+- Applying deterministic compatibility rules.
+- Computing affected operations.
+- Computing test coverage projections.
+- Managing test-case lifecycle transitions.
+- Executing eligible regression cases.
+- Validating candidate responses.
+- Calling the AI provider after consent.
+- Validating AI-generated data.
+- Persisting comparison, test-case, and test-run records.
 
-The backend is the source of truth for business logic.
+## 4. API and Request Processing
 
-## 4. Frontend Technical Requirements
+The backend exposes versioned REST API routes under:
 
-### 4.1 React
+`/api/v1`
 
-Use functional React components and hooks.
+A normal authenticated request follows this processing sequence:
 
-Keep components focused on their responsibilities.
+1. Receive the HTTP request.
+2. Apply relevant security and request middleware.
+3. Validate authentication where required.
+4. Validate resource ownership and policy.
+5. Validate request input.
+6. Invoke the relevant controller.
+7. Execute domain logic through services.
+8. Access persistence models where required.
+9. Return a structured response.
+10. Handle errors through the application's centralized error-handling layer.
 
-Reusable UI components should remain separate from feature-specific application logic.
+Controllers should remain focused on coordinating requests and responses. Compatibility logic, reference traversal, test eligibility, and provider-output validation belong in services or dedicated domain modules.
 
-### 4.2 Routing
+## 5. Authentication and Authorization
 
-Use React Router for navigation between application pages.
+### 5.1 Password Handling
 
-Protected routes must require authenticated access.
+Passwords are hashed using bcrypt.
 
-The application must preserve the project context when navigating between specifications, comparisons, reports, and test cases.
+Requirements:
 
-### 4.3 Server-State Management
+- Hash passwords before persistence.
+- Verify credentials through the hashing library.
+- Never persist plaintext passwords.
+- Never include password hashes in normal API responses.
+- Never log passwords or password hashes.
+- Do not expose authentication secrets to frontend code.
 
-Use TanStack Query for API-backed data.
+### 5.2 Token Handling
 
-This includes:
+JWT authentication is handled on the backend.
 
-- Account information.
-- Project records.
-- Specification versions.
-- Comparison reports.
-- Test cases.
-- Coverage information.
+The authentication token is transported through an HttpOnly cookie.
 
-Successful mutations should invalidate or update relevant queries so that displayed information remains consistent.
+Requirements:
 
-Avoid maintaining unnecessary duplicate copies of server data in component state.
+- Validate token signatures.
+- Enforce configured expiration.
+- Keep signing secrets server-side.
+- Use appropriate cookie security settings.
+- Clear the authentication cookie during logout.
+- Avoid storing JWTs in browser localStorage or sessionStorage.
 
-### 4.4 Forms and Validation
+### 5.3 Ownership Enforcement
 
-Use React Hook Form for form state and Zod for client-side validation.
+The authenticated user is the owner of their projects.
 
-Client validation improves usability but does not replace backend validation.
+For every project and child-resource operation, the backend must verify that the requested resource belongs to a project owned by the authenticated user.
 
-Every request must be independently validated by the server.
+Client-supplied owner identifiers must never be accepted as authoritative ownership information.
 
-### 4.5 Styling
+## 6. OpenAPI Document Processing
 
-Use Tailwind CSS and the existing application styling architecture.
+### 6.1 Supported Input Formats
 
-Maintain consistent spacing, typography, colors, component behavior, and responsive layouts.
-
-Do not introduce an additional styling framework without a specific requirement.
-
-## 5. Backend Technical Requirements
-
-### 5.1 Express Application
-
-Express is responsible for:
-
-- API routing.
-- Middleware execution.
-- Authentication.
-- Request validation.
-- Controller execution.
-- Error handling.
-- Production frontend serving.
-
-Routes should define endpoint mappings, controllers should coordinate requests, and services should contain business logic.
-
-### 5.2 Database
-
-Use MongoDB with Mongoose.
-
-The application uses the following principal collections:
-
-- `users`
-- `projects`
-- `specVersions`
-- `diffReports`
-- `testCases`
-
-The `testRuns` collection is reserved for the planned regression-runner implementation.
-
-Collection structures, relationships, indexes, and constraints are documented in `Schema.md`.
-
-### 5.3 Authentication
-
-Use bcrypt for password hashing and `jsonwebtoken` for JWT authentication.
-
-Authentication requirements:
-
-- Passwords must never be stored in plaintext.
-- Password hashes must not be returned in API responses.
-- JWT authentication uses an HttpOnly cookie.
-- Authentication cookies must have appropriately configured security attributes.
-- Logout must clear the authentication cookie.
-- Protected endpoints must verify the authenticated user.
-- The frontend must not store authentication tokens in local storage.
-
-### 5.4 Authorization
-
-Authorization must be enforced on the backend.
-
-Every project belongs to an authenticated user.
-
-Every child-resource request must verify ownership through its parent project.
-
-The backend must not trust client-supplied owner identifiers.
-
-### 5.5 Error Handling
-
-Use centralized error-handling middleware.
-
-Errors should have consistent response structures and appropriate HTTP status codes.
-
-The application must:
-
-- Avoid exposing stack traces in production responses.
-- Avoid leaking database implementation details.
-- Return useful validation errors.
-- Distinguish authentication, authorization, resource, and server errors.
-- Log sufficient diagnostic information without exposing secrets.
-
-## 6. OpenAPI Specification Processing
-
-### 6.1 Supported Formats
-
-The application accepts:
+The upload pipeline accepts:
 
 - JSON.
 - YAML.
 
-Only valid and supported OpenAPI specification versions should be accepted for the corresponding workflows.
+The backend must validate uploaded content independently of frontend file-extension checks.
 
-### 6.2 Parsing
+### 6.2 Processing Pipeline
 
-Use `@scalar/openapi-parser` for OpenAPI parsing and structural validation.
-
-Parsing and compatibility support are separate concerns. A document may parse successfully while containing constructs that the analysis engine cannot fully evaluate.
-
-### 6.3 Processing Pipeline
-
-```text
-Specification Upload
-        |
-        v
-File Validation
-        |
-        v
-Format Detection
-        |
-        v
-JSON/YAML Parsing
-        |
-        v
-OpenAPI Version Validation
-        |
-        v
-Structural Validation
-        |
-        v
-Supported-Feature Inspection
-        |
-        v
-Normalization
-        |
-        v
-Operation and Schema Extraction
-        |
-        v
-Persistence
+```mermaid
+flowchart TD
+    A["Uploaded Document"] --> B["Size and Input Validation"]
+    B --> C["Format Detection"]
+    C --> D["Parse JSON or YAML"]
+    D --> E["OpenAPI Validation"]
+    E --> F["Supported Construct Analysis"]
+    F --> G["Reference and Resource Checks"]
+    G --> H["Normalized Representation"]
+    H --> I["Content Hash and Version Persistence"]
 ```
 
-### 6.4 Upload Security
+### 6.3 Validation Requirements
 
-- Enforce the configured maximum upload size.
-- Accept only supported document formats.
-- Do not trust client-provided filenames or MIME types.
-- Parse YAML using safe configuration.
-- Disable YAML alias expansion.
-- Reject unsupported YAML tags and duplicate mapping keys.
-- Enforce document depth and parsed-node limits.
-- Calculate SHA-256 from the original uploaded bytes.
-- Do not execute uploaded content.
-- Do not fetch external references or declared server URLs.
+The processing pipeline must:
 
-### 6.5 Reference Handling
+- Reject malformed documents.
+- Validate supported OpenAPI versions and document structure.
+- Enforce upload-size constraints.
+- Enforce parser and normalized-document limits.
+- Reject or report unsupported constructs.
+- Prevent unbounded schema expansion.
+- Avoid external network requests while resolving references.
+- Preserve the original uploaded content.
+- Preserve relevant source locations for diagnostics.
 
-Support internal references within the implemented reference-resolution subset.
+### 6.4 Resource Limits
 
-The implementation must:
+The initial document-processing constraints include:
 
-- Detect circular references.
-- Enforce reference-depth limits.
-- Handle unresolved references explicitly.
-- Avoid unbounded schema expansion.
-- Report unsupported reference behavior.
-- Never fetch remote `$ref` resources.
+| Resource | Limit |
+|---|---:|
+| Original uploaded specification | 1 MiB |
+| Path entries | 250 |
+| Operations | 500 |
+| Document nesting depth | 100 |
+| Parsed node count | 50,000 |
+| Internal reference depth | 20 |
+| Normalized representation | 8 MiB |
 
-## 7. Compatibility Analysis Engine
+These constraints must be enforced server-side.
 
-### 7.1 Purpose
+A limit violation must produce a controlled diagnostic or rejection rather than uncontrolled processing.
 
-The compatibility engine compares a baseline specification against a candidate specification.
+### 6.5 Version Persistence
 
-The comparison direction is:
+A specification version stores:
+
+- Original content.
+- Source format.
+- SHA-256 content hash.
+- Parsed or normalized representation where supported.
+- Operation count.
+- Parsing status.
+- Support status.
+- Warnings and diagnostics.
+- Server-derived execution profile.
+
+Uploaded specification versions are immutable.
+
+## 7. Compatibility Analysis Requirements
+
+### 7.1 Comparison Direction
+
+The compatibility engine evaluates:
 
 `BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`
 
-The baseline represents the existing consumer contract. The candidate represents the updated provider contract.
+The baseline describes the existing consumer contract.
 
-### 7.2 Implementation Requirements
+The candidate describes the newer provider contract.
 
-The engine must:
+### 7.2 Ruleset Versioning
 
-- Compare supported API operations.
-- Match operations using canonical method and path identifiers.
-- Identify supported request and response contract changes.
-- Apply deterministic compatibility rules.
-- Assign stable rule identifiers.
-- Classify findings.
-- Generate explanatory messages.
-- Identify affected operations.
-- Report unsupported analysis constructs.
-
-### 7.3 Ruleset
-
-The initial ruleset identifier is:
+The current compatibility ruleset identifier is:
 
 `CG-COMPAT-1.1`
 
-Supported finding classifications:
+Every comparison report must retain the ruleset version used to generate its findings.
+
+Changing compatibility rules must not silently rewrite historical reports.
+
+### 7.3 Supported Finding Classifications
 
 - `BREAKING`
 - `POTENTIALLY_BREAKING`
@@ -386,66 +341,80 @@ Supported finding classifications:
 - `INFORMATIONAL`
 - `UNSUPPORTED`
 
-Analysis statuses:
+### 7.4 Analysis Status
 
 - `COMPLETE`
 - `PARTIAL`
 - `FAILED`
 
-The complete compatibility-rule definitions are maintained in `Rules.md`.
+Unsupported relevant constructs must remain visible and must not silently become a successful compatibility result.
 
-### 7.4 Determinism
+### 7.5 Change Record Requirements
 
-Given identical normalized baseline and candidate specifications and the same ruleset:
+A compatibility finding should retain:
 
-- Operation matching must remain consistent.
-- Finding identifiers must remain stable.
-- Rule assignments must remain consistent.
-- Classifications must remain consistent.
-- Findings must follow a deterministic ordering.
+- Stable change identifier.
+- Rule identifier.
+- Classification.
+- HTTP method where applicable.
+- API path where applicable.
+- Canonical operation key.
+- Affected operation keys.
+- JSON Pointer or relevant source location.
+- Summary.
+- Rationale.
+- Previous value.
+- Candidate value.
 
-Random values must not influence compatibility decisions.
+### 7.6 Determinism
 
-### 7.5 Shared-Schema Impact
+Compatibility analysis must not depend on AI output.
 
-The engine must track supported internal schema references.
+For identical supported normalized inputs and the same ruleset version, the engine should produce stable findings.
 
-When a shared schema changes, it should identify the affected operations through the supported reference graph.
+Compatibility rules must have automated fixtures for supported behavior.
 
-Affected canonical operation keys are used for test-case traceability.
+## 8. Change Impact and Coverage Requirements
 
-Unresolved, circular, external, or bounded-out references must produce appropriate warnings and partial-analysis status.
+The impact layer connects compatibility findings to affected API operations and baseline test cases.
 
-The current implementation uses conservative impact propagation within supported operation scopes. It must not claim exact pointer-level attribution when the available reference information cannot establish it.
+Requirements:
 
-## 8. Change-to-Test Traceability
-
-Each comparison finding should identify the operations affected by the change.
-
-The traceability service matches affected operation keys against test cases belonging to the comparison's baseline specification version.
+- Preserve canonical operation identifiers.
+- Resolve supported internal schema references.
+- Identify operations affected by supported shared-schema changes.
+- Avoid silently assuming unresolved relationships are complete.
+- Link findings to test cases using the comparison's baseline version.
+- Distinguish draft cases from approved cases.
+- Exclude archived test cases from active coverage.
 
 Coverage states:
 
-| State | Meaning |
-|---|---|
-| `COVERED` | Every affected operation has an approved linked test case. |
-| `DRAFT_ONLY` | Every affected operation has a linked case, but at least one is covered only by drafts. |
-| `UNCOVERED` | At least one affected operation has no linked test case. |
-| `UNMAPPED` | The finding cannot be reliably mapped to an affected operation. |
+- `COVERED`
+- `DRAFT_ONLY`
+- `UNCOVERED`
+- `UNMAPPED`
 
-Coverage must:
+Coverage represents the availability of test cases, not successful execution.
 
-- Be calculated at operation level.
-- Ignore archived test cases.
-- Distinguish approved and draft cases.
-- Support changes affecting multiple operations.
-- Remain separate from actual execution results.
+The regression runner remains responsible for execution evidence.
 
-Coverage indicates test availability, not successful regression execution.
+## 9. Test Case Requirements
 
-## 9. Test Case Management
+A test case represents a bounded request scenario associated with a baseline API operation.
 
-Test cases are associated with a specific baseline specification version and canonical operation key.
+Required attributes include:
+
+- Project identifier.
+- Baseline specification version identifier.
+- Canonical operation key.
+- Operation path.
+- Title.
+- Source.
+- Lifecycle status.
+- Request parameters.
+- Assertions.
+- Optional AI generation metadata.
 
 Supported lifecycle states:
 
@@ -453,206 +422,249 @@ Supported lifecycle states:
 - `APPROVED`
 - `ARCHIVED`
 
-Requirements:
+Only approved and eligible cases can be selected for regression execution.
 
-- Users can create and inspect test cases.
-- Draft cases can be updated.
-- Approval must be a server-controlled transition.
-- Approved cases must not be silently modified.
-- Corrections to approved cases require a new draft.
-- Archived cases must not count toward active coverage.
-- Test-case ownership and baseline-version relationships must be validated.
+Draft cases may be edited. Approval must be a deliberate backend-controlled transition.
 
-The Phase 6 implementation covers test-case management and traceability. Actual regression execution remains a separate development phase.
+Approved cases must not be silently changed through the normal draft-update path.
 
-## 10. Planned Regression Runner
+## 10. Regression Runner Requirements
 
-The regression runner is a planned extension, not part of the current Phase 6 implementation.
+### 10.1 Execution Boundary
 
-Its purpose is to execute approved baseline test cases against the bundled candidate Demo Store implementation.
+The runner is intentionally restricted to the bundled Demo Store implementation.
 
-### 10.1 Execution Architecture
+It does not execute against arbitrary user-supplied URLs, remote hosts, or uploaded OpenAPI server declarations.
 
-Use a server-controlled, in-process adapter.
+### 10.2 Eligibility
 
-The runner must not operate as an unrestricted external HTTP proxy.
+A run requires:
 
-Execution must be restricted to:
-
-- Recognized bundled candidate fixtures.
+- An existing comparison.
+- A valid baseline and candidate relationship.
+- A recognized server-side candidate fixture.
 - Approved test cases.
+- Test cases belonging to the comparison's baseline specification version.
 - Supported GET operations.
-- Validated path and query parameters.
 
-### 10.2 Response Validation
+### 10.3 Execution Model
 
-The candidate implementation supplies the response.
+The runner uses a server-controlled implementation adapter for the bundled candidate.
 
-The baseline specification defines the expected consumer contract.
+The client cannot choose:
 
-Therefore, candidate responses must be validated against the baseline response schema.
+- Arbitrary target URLs.
+- Hostnames.
+- Ports.
+- Network destinations.
+- Fixture identifiers.
+- Candidate implementation versions.
 
-Use Ajv with the appropriate normalization for supported OpenAPI schema dialects.
+### 10.4 Response Validation
 
-Unsupported response-schema constructs must not be reported as complete validation passes.
+Candidate responses must be evaluated against the applicable baseline response contract.
 
-### 10.3 Execution Limits
+Validation may include supported:
 
-Initial proposed limits:
+- HTTP status expectations.
+- Response media-type expectations.
+- JSON Schema constraints.
+- Explicit test-case assertions.
 
-| Resource | Limit |
-|---|---:|
-| Test cases per run | 20 |
-| Concurrent runs | 2 |
-| Concurrent tests per run | 2 |
-| Per-test timeout | 5 seconds |
-| Total run deadline | 60 seconds |
-| Response body | 256 KiB |
-| Stored evidence per result | 16 KiB |
+A successful HTTP status alone is not sufficient evidence of a passing regression test.
 
-The backend must enforce these limits.
+Unsupported validation behavior must not be represented as a complete pass.
 
-### 10.4 Execution Safety
+### 10.5 Execution Status
 
-- No arbitrary target URLs.
-- No client-controlled hostnames or network destinations.
-- No arbitrary executable test code.
-- No user-supplied authentication credentials.
-- No execution of unapproved test cases.
-- No execution of unsupported HTTP methods.
+Run-level statuses:
 
-## 11. Planned AI Integration
+- `QUEUED`
+- `RUNNING`
+- `PASSED`
+- `FAILED`
+- `PARTIAL`
+- `INTERRUPTED`
 
-AI-assisted test generation is an optional future capability.
+Individual test outcomes:
 
-It must not be required for authentication, specification management, compatibility analysis, or test-case management.
+- `PASSED`
+- `FAILED`
+- `SKIPPED`
+- `UNSUPPORTED`
+- `ERROR`
 
-Requirements:
+The runner must persist bounded result snapshots and relevant execution evidence.
 
-- Provider access remains server-side.
-- Provider credentials are stored only in environment configuration.
-- The user must explicitly consent before data is submitted externally.
-- Free-tier requests must use approved bundled synthetic specifications only.
-- Arbitrary uploaded specifications and production data must not be sent.
-- AI output must be validated using Zod.
-- Generated test cases must begin as drafts.
-- Human approval is required before a suggestion becomes eligible for execution.
-- AI must not determine compatibility classifications or test pass/fail results.
-- The application must remain fully usable without AI configuration.
+### 10.6 Execution Limits
 
-## 12. Security Requirements
+The runner applies bounded execution controls, including limits on:
 
-The application must enforce the following boundaries:
+- Test cases per run.
+- Concurrent runs.
+- Concurrent tests within a run.
+- Individual test duration.
+- Total run duration.
+- Response size.
+- Stored evidence size.
+- Validation diagnostic count.
 
-- bcrypt password hashing.
-- JWT authentication through HttpOnly cookies.
-- Server-side project ownership checks.
-- Request validation.
-- Upload-size restrictions.
-- Safe JSON and YAML parsing.
-- Internal-only reference resolution.
-- Rate limiting on sensitive endpoints.
-- Appropriate HTTP security headers.
-- Secure error handling.
-- No arbitrary network execution.
-- No exposure of authentication credentials or API keys.
-- No client-controlled execution targets.
+These constraints must be enforced by the backend, not by the frontend.
 
-Unsafe cookie-authenticated requests must receive appropriate CSRF or origin protection.
+## 11. AI Integration Requirements
 
-## 13. Testing Requirements
+### 11.1 Provider
 
-Automated tests must cover:
+Google Gemini Developer API through:
 
-### Unit Testing
+`@google/genai`
 
-- Validators.
-- Service functions.
-- Operation matching.
+The model is selected through backend configuration rather than hardcoded into frontend code.
+
+### 11.2 Supported Operations
+
+| Operation | Method | Path |
+|---|---|---|
+| `listProducts` | GET | `/products` |
+| `getProduct` | GET | `/products/{productId}` |
+
+### 11.3 Context Boundary
+
+The AI integration uses trusted synthetic Demo Store context.
+
+The application must not send arbitrary uploaded production specifications, customer data, authentication credentials, or confidential business data through the current unpaid AI integration.
+
+### 11.4 Consent and Submission
+
+The generation pipeline requires:
+
+1. Supported operation selection.
+2. Trusted context construction.
+3. Submission preview.
+4. Explicit user consent.
+5. Backend provider invocation.
+6. Structured output validation.
+7. Draft persistence.
+
+The backend is responsible for validating the operation identity and selected context.
+
+### 11.5 Output Validation
+
+AI output must satisfy a strict structured format.
+
+The application must reject:
+
+- Invalid structured output.
+- Suggestions for a different operation.
+- Missing required draft fields.
+- Unsupported request or assertion formats.
+- Oversized or malformed responses.
+
+AI output is data, not executable code.
+
+### 11.6 Failure Handling
+
+The AI integration must handle:
+
+- Missing API key.
+- Provider authentication failure.
+- Provider quota exhaustion.
+- Provider rate limits.
+- Network errors.
+- Invalid model output.
+- Operation mismatch.
+- Persistence errors.
+
+Failure of AI generation must not block the non-AI workflows.
+
+## 12. Persistence Requirements
+
+MongoDB collections:
+
+- `users`
+- `projects`
+- `specVersions`
+- `diffReports`
+- `testCases`
+- `testRuns`
+
+Mongoose models define persistence constraints, references, timestamps, and indexes.
+
+Zod validates incoming application data independently of Mongoose validation.
+
+Every child-resource relationship must be checked at the service layer.
+
+Completed comparison findings and completed test-run evidence must remain historically consistent.
+
+Refer to [Schema.md](Schema.md) for the detailed model.
+
+## 13. Error Handling
+
+The backend should return consistent error structures.
+
+Errors must distinguish relevant categories such as:
+
+- Authentication failure.
+- Authorization or ownership failure.
+- Validation failure.
+- Missing resource.
+- Duplicate resource.
+- Unsupported specification.
+- Partial analysis.
+- Compatibility processing failure.
+- Test execution failure.
+- AI configuration failure.
+- AI provider failure.
+- Rate-limit rejection.
+
+Internal stack traces, secrets, and sensitive implementation details must not be returned to clients.
+
+## 14. Testing Requirements
+
+### Unit Tests
+
+Cover:
+
 - Compatibility rules.
-- Shared-schema impact analysis.
-- Traceability calculations.
-- Test-case lifecycle transitions.
+- Normalization.
+- Reference-impact analysis.
+- Traceability.
+- Test-case validation.
+- Test eligibility.
+- AI context construction.
+- AI output validation.
+- Persistence transformations.
 
-### Integration Testing
+### Integration Tests
 
-- Authentication endpoints.
-- Project ownership.
+Cover:
+
+- Authentication routes.
+- Ownership enforcement.
 - Specification upload.
-- Specification retrieval.
 - Comparison creation and retrieval.
-- Change-to-test traceability.
-- Test-case creation, approval, update, and archival.
+- Test-case lifecycle.
+- Regression execution.
+- AI suggestion routes.
+- Draft persistence.
 
 ### Frontend Verification
 
-- ESLint checks.
+Run:
+
+- ESLint.
 - Production build.
-- Primary navigation.
-- Core form workflows.
-- Comparison and test-case screens.
-- Loading and error states.
+- Relevant component and interaction tests where available.
 
-### Regression Testing
+Tests must verify failure paths as well as successful workflows.
 
-Every supported compatibility rule must have appropriate fixtures.
+## 15. Related Documentation
 
-Unsupported constructs must have explicit tests to ensure they do not silently produce complete analysis results.
-
-## 14. Runtime and Configuration
-
-The application uses Node.js and npm.
-
-Environment-specific configuration belongs in environment files and must not be committed with real credentials.
-
-Configuration must cover the requirements of:
-
-- MongoDB connection.
-- JWT signing and verification.
-- Cookie security.
-- Frontend origin and application environment.
-- Upload and parser limits.
-- Rate limits.
-- Optional AI provider access.
-
-The application must fail safely when required configuration is missing.
-
-Secrets must never be hardcoded into frontend source code.
-
-## 15. Development and Production Architecture
-
-### Development
-
-- Vite runs the React application.
-- Express runs the backend API.
-- Vite proxies API requests to Express.
-- MongoDB stores application records.
-
-### Production
-
-- The React frontend is built into static assets.
-- Express serves the built frontend and API.
-- The browser communicates through the same application origin.
-- MongoDB remains the persistent database.
-
-The initial architecture does not require microservices, a separate API gateway, or distributed background workers.
-
-## 16. Technical Acceptance Criteria
-
-The technical implementation is accepted when:
-
-1. Frontend and backend responsibilities remain separated.
-2. Authentication and ownership checks are enforced server-side.
-3. Specification uploads are bounded and safely processed.
-4. Original specification content and hashes are preserved.
-5. Supported OpenAPI constructs are normalized consistently.
-6. Compatibility results are deterministic.
-7. Unsupported constructs are explicitly reported.
-8. Shared-schema changes identify supported affected operations.
-9. Test cases are associated with their correct baseline specification versions.
-10. Coverage calculations distinguish all four supported states.
-11. Test-case lifecycle transitions are validated.
-12. Historical comparison findings remain unchanged.
-13. Automated tests cover critical backend workflows.
-14. Frontend linting and production builds complete successfully.
-15. Planned runner and AI capabilities are not represented as completed functionality before their implementation and validation.
+- [Product Requirements](PRD.md)
+- [Design Specification](Design.md)
+- [System Architecture](Architecture.md)
+- [Application Flow](AppFlow.md)
+- [Data Model and Schema](Schema.md)
+- [Compatibility Rules](Rules.md)
+- [Backend API](API.md)
+- [Security Review](SecurityReview.md)

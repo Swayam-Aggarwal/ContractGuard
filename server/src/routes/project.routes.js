@@ -1,5 +1,4 @@
-﻿
-import express from "express";
+﻿import express from "express";
 
 import createProjectController from
   "../controllers/project.controller.js";
@@ -39,30 +38,30 @@ const createProjectRouter = (config) => {
   const router = express.Router();
 
   const controller = createProjectController();
-  const specVersionController = createSpecVersionController();
 
-  const diffReportRouter = createDiffReportRouter();
+  const specVersionController =
+    createSpecVersionController();
 
-  const requireAuth = createAuthMiddleware(config);
+  const diffReportRouter =
+    createDiffReportRouter(config);
 
-  // Every project endpoint requires an authenticated user.
+  const requireAuth =
+    createAuthMiddleware(config);
+
+  // All project endpoints require an authenticated user.
   router.use(requireAuth);
 
-  // List projects belonging to the current user.
   router.get(
     "/",
     controller.listProjects
   );
 
-  // Create a project for the current user.
   router.post(
     "/",
     validateBody(createProjectSchema),
     controller.createProject
   );
 
-  // Upload a specification to a project.
-  // Verify ownership before processing the uploaded file.
   router.post(
     "/:projectId/specifications",
     validateParams(projectIdSchema),
@@ -72,27 +71,24 @@ const createProjectRouter = (config) => {
     specVersionController.uploadSpecification
   );
 
-  // List specification versions belonging to an owned project.
   router.get(
     "/:projectId/specifications",
     validateParams(projectIdSchema),
     specVersionController.listSpecificationVersions
   );
 
-  // Comparison reports for an owned project.
+  // The nested report router also receives the optional AI configuration.
   router.use(
     "/:projectId/diff-reports",
     diffReportRouter
   );
 
-  // Retrieve one owned project.
   router.get(
     "/:projectId",
     validateParams(projectIdSchema),
     controller.getProject
   );
 
-  // Update an owned project.
   router.patch(
     "/:projectId",
     validateParams(projectIdSchema),
@@ -100,7 +96,6 @@ const createProjectRouter = (config) => {
     controller.updateProject
   );
 
-  // Delete an owned project and dependent records.
   router.delete(
     "/:projectId",
     validateParams(projectIdSchema),

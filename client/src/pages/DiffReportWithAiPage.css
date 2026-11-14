@@ -1,0 +1,35 @@
+.ai-suggestions-launcher {
+  position: fixed;
+  right: 25px;
+  bottom: 25px;
+  z-index: 100;
+}
+
+.ai-suggestions-launcher .button {
+  display: inline-flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  box-shadow: 0 9px 28px rgba(26, 50, 84, 0.24);
+}
+
+.ai-suggestions-launcher .button:focus-visible {
+  outline: 3px solid rgba(72, 122, 190, 0.4);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .ai-suggestions-launcher {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .ai-suggestions-launcher .button {
+    min-height: 41px;
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+}

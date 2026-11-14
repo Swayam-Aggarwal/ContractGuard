@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const MAX_REQUEST_ENTRIES = 20;
@@ -11,6 +10,7 @@ const requestSchema = new mongoose.Schema(
       of: String,
       default: () => new Map(),
     },
+
     queryParams: {
       type: Map,
       of: String,
@@ -31,16 +31,19 @@ const propertyAssertionSchema = new mongoose.Schema(
       required: true,
       enum: ["VALUE", "PRESENCE"],
     },
+
     path: {
       type: String,
       required: true,
       trim: true,
       maxlength: 300,
     },
+
     value: {
       type: mongoose.Schema.Types.Mixed,
       default: undefined,
     },
+
     present: {
       type: Boolean,
       default: undefined,
@@ -62,14 +65,19 @@ const assertionsSchema = new mongoose.Schema(
       validate: Number.isInteger,
       default: undefined,
     },
+
     propertyAssertions: {
       type: [propertyAssertionSchema],
       default: [],
       validate: {
-        validator: (value) => value.length <= MAX_ASSERTIONS,
-        message: `At most ${MAX_ASSERTIONS} property assertions are allowed.`,
+        validator: (value) =>
+          value.length <= MAX_ASSERTIONS,
+
+        message:
+          `At most ${MAX_ASSERTIONS} property assertions are allowed.`,
       },
     },
+
     requiredProperties: {
       type: [
         {
@@ -78,10 +86,15 @@ const assertionsSchema = new mongoose.Schema(
           maxlength: 300,
         },
       ],
+
       default: [],
+
       validate: {
-        validator: (value) => value.length <= MAX_ASSERTIONS,
-        message: `At most ${MAX_ASSERTIONS} required properties are allowed.`,
+        validator: (value) =>
+          value.length <= MAX_ASSERTIONS,
+
+        message:
+          `At most ${MAX_ASSERTIONS} required properties are allowed.`,
       },
     },
   },
@@ -99,17 +112,30 @@ const generationMetadataSchema = new mongoose.Schema(
       trim: true,
       maxlength: 80,
     },
+
     model: {
       type: String,
       trim: true,
       maxlength: 120,
     },
+
     generatedAt: Date,
+
     contextVersion: {
       type: String,
       trim: true,
       maxlength: 80,
     },
+
+    // Records the consent wording/version shown to the user.
+    consentVersion: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+    },
+
+    // Records when the user accepted that consent for this request.
+    consentedAt: Date,
   },
   {
     _id: false,
@@ -126,12 +152,14 @@ const testCaseSchema = new mongoose.Schema(
       required: true,
       immutable: true,
     },
+
     specVersionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SpecVersion",
       required: true,
       immutable: true,
     },
+
     operationKey: {
       type: String,
       required: true,
@@ -140,6 +168,7 @@ const testCaseSchema = new mongoose.Schema(
       maxlength: 80,
       immutable: true,
     },
+
     operationPath: {
       type: String,
       required: true,
@@ -147,6 +176,7 @@ const testCaseSchema = new mongoose.Schema(
       maxlength: 1000,
       immutable: true,
     },
+
     title: {
       type: String,
       required: true,
@@ -154,12 +184,14 @@ const testCaseSchema = new mongoose.Schema(
       minlength: 1,
       maxlength: 120,
     },
+
     description: {
       type: String,
       trim: true,
       maxlength: 1000,
       default: "",
     },
+
     source: {
       type: String,
       required: true,
@@ -167,27 +199,32 @@ const testCaseSchema = new mongoose.Schema(
       default: "MANUAL",
       immutable: true,
     },
+
     status: {
       type: String,
       required: true,
       enum: ["DRAFT", "APPROVED", "ARCHIVED"],
       default: "DRAFT",
     },
+
     request: {
       type: requestSchema,
       required: true,
       default: () => ({}),
     },
+
     assertions: {
       type: assertionsSchema,
       required: true,
       default: () => ({}),
     },
+
     generationMetadata: {
       type: generationMetadataSchema,
       default: undefined,
       immutable: true,
     },
+
     approvedAt: {
       type: Date,
       default: null,
@@ -204,8 +241,11 @@ const testCaseSchema = new mongoose.Schema(
 );
 
 testCaseSchema.pre("validate", function () {
-  const pathCount = this.request?.pathParams?.size ?? 0;
-  const queryCount = this.request?.queryParams?.size ?? 0;
+  const pathCount =
+    this.request?.pathParams?.size ?? 0;
+
+  const queryCount =
+    this.request?.queryParams?.size ?? 0;
 
   if (pathCount + queryCount > MAX_REQUEST_ENTRIES) {
     this.invalidate(
@@ -215,34 +255,78 @@ testCaseSchema.pre("validate", function () {
     );
   }
 
-  for (const [index, assertion] of (this.assertions?.propertyAssertions ?? []).entries()) {
-    if (assertion.type === "VALUE" && assertion.value === undefined) {
+  for (
+    const [
+      index,
+      assertion,
+    ] of (this.assertions?.propertyAssertions ?? []).entries()
+  ) {
+    if (
+      assertion.type === "VALUE" &&
+      assertion.value === undefined
+    ) {
       this.invalidate(
         `assertions.propertyAssertions.${index}.value`,
         "A VALUE assertion requires a value."
       );
     }
 
-    if (assertion.type === "PRESENCE" && typeof assertion.present !== "boolean") {
+    if (
+      assertion.type === "PRESENCE" &&
+      typeof assertion.present !== "boolean"
+    ) {
       this.invalidate(
         `assertions.propertyAssertions.${index}.present`,
         "A PRESENCE assertion requires a boolean present value."
       );
     }
   }
+
+  if (this.source === "AI") {
+    const metadata = this.generationMetadata;
+
+    if (
+      !metadata ||
+      !metadata.provider ||
+      !metadata.model ||
+      !(metadata.generatedAt instanceof Date) ||
+      !metadata.contextVersion ||
+      !metadata.consentVersion ||
+      !(metadata.consentedAt instanceof Date)
+    ) {
+      this.invalidate(
+        "generationMetadata",
+        "AI-generated test cases require complete generation and consent metadata."
+      );
+    }
+  }
 });
 
 testCaseSchema.index(
-  { projectId: 1, specVersionId: 1, status: 1, createdAt: -1 },
-  { name: "idx_testcases_project_version_status_created" }
+  {
+    projectId: 1,
+    specVersionId: 1,
+    status: 1,
+    createdAt: -1,
+  },
+  {
+    name: "idx_testcases_project_version_status_created",
+  }
 );
 
 testCaseSchema.index(
-  { projectId: 1, specVersionId: 1, operationKey: 1 },
-  { name: "idx_testcases_project_version_operation" }
+  {
+    projectId: 1,
+    specVersionId: 1,
+    operationKey: 1,
+  },
+  {
+    name: "idx_testcases_project_version_operation",
+  }
 );
 
-const TestCase = mongoose.models.TestCase ||
+const TestCase =
+  mongoose.models.TestCase ||
   mongoose.model("TestCase", testCaseSchema);
 
 export default TestCase;

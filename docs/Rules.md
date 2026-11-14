@@ -1,15 +1,20 @@
 # Compatibility Rules and Analysis Semantics
 
-**Product:** ContractGuard  
-**Ruleset:** `CG-COMPAT-1.1`  
-**Comparison direction:** Baseline consumer → candidate provider  
-**Status:** Normative v1 rule baseline
+**Product:** ContractGuard\
+**Ruleset:** `CG-COMPAT-1.1`\
+**Comparison direction:** Baseline consumer → candidate provider\
+**Document status:** Normative compatibility ruleset\
+**Last updated:** 14 November 2026
+
+---
 
 ## 1. Purpose
 
-This document defines the deterministic rules used by ContractGuard to compare two OpenAPI specification versions. It is the source of truth for compatibility classifications, change reports, and rule-level test fixtures.
+This document defines the deterministic rules used by ContractGuard to compare two OpenAPI specification versions.
 
-ContractGuard asks:
+It is the normative reference for compatibility classifications, comparison findings, rule identifiers, and rule-level test fixtures.
+
+ContractGuard evaluates the following question:
 
 > If a consumer was built against the baseline contract, can it continue communicating with a provider that implements the candidate contract?
 
@@ -18,9 +23,9 @@ This is a directional, consumer-oriented backward-compatibility assessment.
 - **Baseline:** The API contract known to existing consumers.
 - **Candidate:** The new API contract implemented by the provider.
 - **Consumer:** An application that sends requests and processes responses according to the baseline contract.
-- **Provider:** The API implementation that is expected to follow the candidate contract.
+- **Provider:** The API implementation expected to follow the candidate contract.
 
-The reverse comparison direction is not supported in v1. Reversing the baseline and candidate may produce different results.
+The reverse comparison direction is not supported in v1. Reversing baseline and candidate may produce different results.
 
 ## 2. Classifications
 
@@ -28,7 +33,7 @@ The reverse comparison direction is not supported in v1. Reversing the baseline 
 |---|---|
 | `BREAKING` | Strong evidence that a valid baseline consumer may fail because the candidate no longer accepts an existing request or may produce a response the consumer cannot process. |
 | `POTENTIALLY_BREAKING` | The change may break consumers depending on generated clients, strict validators, serialization behavior, or runtime conventions. |
-| `NON_BREAKING` | The supported rule indicates that the change should preserve baseline consumer behavior under the stated assumptions. |
+| `NON_BREAKING` | The supported rule indicates that the change should preserve baseline consumer behavior under the documented assumptions. |
 | `INFORMATIONAL` | Documentation or metadata changed without an identified contract impact. |
 | `UNSUPPORTED` | The change involves a construct that the current ruleset cannot reliably analyze. |
 
@@ -42,7 +47,7 @@ The reverse comparison direction is not supported in v1. Reversing the baseline 
 
 A report with unsupported changes must never be represented as fully compatible.
 
-A `COMPLETE` report does not mean that the candidate API implementation has been proven correct. It only means that the supported specification changes were analyzed successfully.
+A `COMPLETE` report does not mean that the candidate API implementation has been proven correct. It means only that the supported specification changes were analyzed successfully.
 
 ## 3. Fundamental Compatibility Principles
 
@@ -60,7 +65,7 @@ Therefore:
 
 Examples:
 
-| Baseline Request | Candidate Request | Expected Result |
+| Baseline request | Candidate request | Expected result |
 |---|---|---|
 | `age`: integer, minimum 0 | `age`: integer, minimum 18 | `BREAKING` |
 | `age`: integer, minimum 0 | `age`: integer, minimum 0 | `NON_BREAKING` |
@@ -84,7 +89,7 @@ Therefore:
 
 Examples:
 
-| Baseline Response | Candidate Response | Expected Result |
+| Baseline response | Candidate response | Expected result |
 |---|---|---|
 | `price`: number | `price`: string | `BREAKING` |
 | Enum: `INR`, `USD` | Enum: `INR` | `NON_BREAKING` |
@@ -168,8 +173,8 @@ Effective parameters are matched as follows:
 
 - Path parameters: by their position in the canonical path template.
 - Query, header, and cookie parameters: by `(name, in)`.
-- Operation-level overrides: apply according to OpenAPI parameter override semantics.
-- Parameter `$ref` values: resolve supported internal references before comparison.
+- Operation-level overrides: according to OpenAPI parameter override semantics.
+- Parameter `$ref` values: resolved through supported internal references before comparison.
 
 | Rule ID | Condition | Classification | Rationale |
 |---|---|---|---|
@@ -257,12 +262,12 @@ Examples of broader response constraints include:
 | `SEC-001` | Candidate introduces a required security scheme where baseline had none | `POTENTIALLY_BREAKING` | Existing unauthenticated consumers may fail. |
 | `SEC-002` | Required OAuth scopes become more restrictive | `POTENTIALLY_BREAKING` | Existing credentials may lack required scopes. |
 | `SEC-003` | Security requirement is relaxed | `INFORMATIONAL` | Compatibility may improve, but security posture may weaken. |
-| `SRV-001` | Server URL changes | `INFORMATIONAL` | Deployment location changed; runtime reachability is not tested in v1. |
+| `SRV-001` | Server URL changes | `INFORMATIONAL` | Deployment location changed; runtime reachability is not tested by specification analysis. |
 | `SRV-002` | Server variable or default changes | `POTENTIALLY_BREAKING` | Generated clients or environments may resolve to a different host. |
 
 ## 10. Schema Comparison Scope
 
-The initial comparator supports the following structural elements within explicitly supported schema constructs:
+The initial comparator supports the following structural elements within the explicitly supported schema subset:
 
 - Primitive `type` changes.
 - Object `properties` additions and removals.
@@ -297,11 +302,11 @@ If a relevant change depends on unsupported semantics:
 
 | Diagnostic ID | Condition | Classification | Rationale |
 |---|---|---|---|
-| `SCH-001` | A relevant schema, reference, serialization, security, server, or parser construct cannot be evaluated completely by the supported v1 subset | `UNSUPPORTED` | The analyzer must expose uncertainty rather than silently assigning a compatibility result. |
+| `SCH-001` | A relevant schema, reference, serialization, security, server, or parser construct cannot be evaluated completely by the supported v1 subset | `UNSUPPORTED` | The analyzer exposes uncertainty rather than silently assigning a compatibility result. |
 
-`SCH-001` is a diagnostic rule identifier. It does not claim that the underlying construct is always breaking; it records that the analyzer cannot prove compatibility.
+`SCH-001` is a diagnostic rule identifier. It does not claim that the underlying construct is always breaking. It records that the analyzer cannot prove compatibility.
 
-The finding must include the affected source location where available, a stable change ID, a summary, a rationale, and affected operation keys where known.
+The finding includes the affected source location where available, a stable change ID, a summary, a rationale, and affected operation keys where known.
 
 Any report containing `SCH-001` must have `PARTIAL` analysis status.
 
@@ -319,7 +324,7 @@ External references are disabled in v1 to prevent unintended network access and 
 
 ## 12. Deterministic Comparison Algorithm
 
-The implementation must follow a stable sequence:
+The implementation follows a stable sequence:
 
 1. Validate the uploaded OpenAPI document.
 2. Identify its OpenAPI version and schema dialect.
@@ -340,7 +345,7 @@ The implementation must follow a stable sequence:
 
 ### 12.1 Stable Change Identifiers
 
-Each finding must include:
+Each finding includes:
 
 - `ruleId`
 - `operationKey`
@@ -350,11 +355,11 @@ Each finding must include:
 - `summary`
 - `rationale`
 
-The `changeId` must be deterministic for the same rule, operation, and location. It must not depend on random values or execution timestamps.
+The `changeId` is deterministic for the same rule, operation, and location. It must not depend on random values or execution timestamps.
 
-### 12.2 Sorting
+### 12.2 Deterministic Sorting
 
-Changes must be sorted consistently by:
+Changes are sorted consistently by:
 
 1. Canonical path.
 2. HTTP method.
@@ -362,7 +367,7 @@ Changes must be sorted consistently by:
 4. JSON Pointer or source location.
 5. Rule ID.
 
-The same input documents and ruleset must produce the same ordered comparison findings.
+The same input documents and ruleset must produce the same ordered findings.
 
 ## 13. Rule Test-Fixture Requirements
 
@@ -370,14 +375,14 @@ Every implemented rule must have automated tests containing:
 
 - A baseline fixture.
 - A candidate fixture.
-- The expected rule ID.
-- The expected classification.
-- The expected operation key.
-- The expected JSON Pointer or source location.
-- The expected overall analysis status.
+- Expected rule ID.
+- Expected classification.
+- Expected operation key.
+- Expected JSON Pointer or source location.
+- Expected overall analysis status.
 - A short rationale.
 
-Tests must include:
+Tests must cover:
 
 - Request compatibility direction.
 - Response compatibility direction.
@@ -385,24 +390,26 @@ Tests must include:
 - Required and optional field changes.
 - Parameter renames.
 - Canonical path matching.
-- Shared schema references.
+- Shared-schema references.
 - Unsupported schema constructs.
 - Cyclic and unresolved references.
 - Deterministic output ordering.
 
-For direction-sensitive rules, include paired fixtures that demonstrate why request and response changes are evaluated differently.
+For direction-sensitive rules, paired fixtures must demonstrate why request and response changes are evaluated differently.
+
+A mapping or finding-contract fixture does not, by itself, count as a complete end-to-end analyzer comparison.
 
 ## 14. Ruleset Versioning
 
 The ruleset identifier is stored with every comparison report.
 
-The current identifier is:
+Current identifier:
 
 `CG-COMPAT-1.1`
 
 A future change to compatibility semantics must increment the ruleset version.
 
-Historical reports must retain the ruleset identifier used when they were created. They must never be silently reinterpreted using a newer ruleset.
+Historical reports retain the ruleset identifier used when they were created. They must never be silently reinterpreted using a newer ruleset.
 
 Updating a rule requires:
 
@@ -410,4 +417,4 @@ Updating a rule requires:
 2. Updating the rule implementation.
 3. Adding or updating automated fixtures.
 4. Documenting the behavior change.
-5. Preserving the historical ruleset identifier for existing reports.
+5. Preserving historical ruleset identifiers for existing reports.

@@ -1,243 +1,535 @@
+# ContractGuard — Implementation Plan and Development Tracker
 
-# ContractGuard — Implementation Plan
+**Document version:** 1.3\
+**Development approach:** Incremental, test-driven modular monolith\
+**Primary language:** JavaScript\
+**Last updated:** 14 November 2026\
+**Document status:** Active development and release-readiness tracker
 
-**Version:** 1.3
-**Last updated:** 11 November 2026
-**Development approach:** Incremental, test-driven modular monolith
-**Primary language:** JavaScript
+---
 
 ## 1. Purpose
 
-This document defines the development roadmap, implementation status, verification requirements, and release milestones for ContractGuard.
+This document defines the implementation roadmap, development phases, technical milestones, verification requirements, and release-readiness criteria for ContractGuard.
 
-It is the central development tracker. Implementation status must reflect actual code, automated test results, and browser verification rather than the existence of source files alone.
+It acts as the central development tracker.
 
-The Product Requirements Document (PRD) remains the source of truth for product scope and priorities.
+The project follows an incremental implementation approach. Every phase must produce a defined outcome supported by implementation and verification evidence.
+
+New functionality must preserve:
+
+- Existing application behavior.
+- Architectural boundaries.
+- Data integrity.
+- Security restrictions.
+- Historical comparison and test-run records.
+- Deterministic compatibility semantics.
+
+The tracker distinguishes implemented functionality from completed acceptance testing and release readiness.
 
 ## 2. Development Principles
 
-1. Preserve the existing application architecture and working functionality.
-2. Inspect dependencies, APIs, imports, exports, and tests before modifying code.
-3. Keep compatibility analysis deterministic and independent of AI.
-4. Separate parsing, normalization, analysis, traceability, and execution.
-5. Validate untrusted input and enforce resource ownership on the backend.
-6. Preserve immutable specification versions and historical comparison results.
-7. Test new functionality before treating it as complete.
-8. Avoid unnecessary dependencies, infrastructure, and architectural complexity.
-9. Distinguish implementation, automated verification, and acceptance.
-10. Document known limitations honestly.
+1. **Incremental implementation:** Develop related functionality in logical, testable batches.
+2. **Preserve architecture:** Keep parsing, normalization, compatibility analysis, impact assessment, execution, and AI integration separate.
+3. **Deterministic domain logic:** Compatibility classifications and regression outcomes remain independent of AI.
+4. **Test-driven development:** Meaningful domain behavior must have automated tests.
+5. **JavaScript throughout:** TypeScript is outside the current project scope.
+6. **Security first:** Validate untrusted input and enforce ownership on the backend.
+7. **Immutable history:** Preserve original specifications and completed comparison and test-run evidence.
+8. **Honest verification:** Do not mark a phase complete solely because its happy path works.
+9. **Minimal infrastructure:** Avoid services and dependencies without a concrete product requirement.
+10. **Reproducible evidence:** Performance and accuracy claims require documented fixtures and measurements.
 
-## 3. Implementation Priorities
+## 3. Priority Definitions
 
 | Priority | Meaning |
 |---|---|
-| P0 | Required for the v1 release |
-| P1 | Important enhancement |
-| P2 | Deferred or optional functionality |
+| `P0` | Required for the v1 release |
+| `P1` | Valuable enhancement after the core product workflow is complete |
+| `P2` | Deferred beyond the current release scope |
 
-## 4. Development Roadmap
+The Product Requirements Document is the source of truth for functional scope and priority.
 
-| Phase | Deliverable | Priority | Status |
-|---|---|---|---|
-| 0 | Documentation and scope | P0 | Baseline established; consistency review ongoing |
-| 1 | Application foundation | P0 | Core implemented; clean-checkout acceptance pending |
-| 2 | Authentication and projects | P0 | Core implemented; security acceptance pending |
-| 3 | OpenAPI ingestion and normalization | P0 | Core implemented; complete parser audit pending |
-| 4 | API Explorer | P0 | Core workflows browser-verified; additional checks pending |
-| 5 | Compatibility analysis engine | P0 | Core implemented; paired analyzer-fixture audit pending |
-| 6 | Change-to-test traceability | P0 | Completed and verified |
-| 7 | Bounded regression runner | P0 | Not implemented |
-| 8 | Optional AI test suggestions | P1 | Not implemented |
-| 9 | Frontend completion | P0 | In progress |
-| 10 | Comprehensive testing and security | P0 | Pending |
-| 11 | CI, deployment, and release | P0 | Pending |
+## 4. Overall Development Roadmap
 
-## 5. Outstanding Verification Before Release
+```mermaid
+flowchart TD
+    P0["Phase 0: Documentation and Scope"]
+    P1["Phase 1: Application Foundation"]
+    P2["Phase 2: Authentication and Projects"]
+    P3["Phase 3: OpenAPI Ingestion"]
+    P4["Phase 4: API Explorer"]
+    P5["Phase 5: Compatibility Engine"]
+    P6["Phase 6: Change-to-Test Traceability"]
+    P7["Phase 7: Regression Runner"]
+    P8["Phase 8: AI Test Suggestions"]
+    P9["Phase 9: Frontend Completion"]
+    P10["Phase 10: Testing and Security"]
+    P11["Phase 11: CI and Release"]
 
-The following checks remain open from earlier phases.
+    P0 --> P1
+    P1 --> P2
+    P2 --> P3
+    P3 --> P4
+    P3 --> P5
+    P4 --> P5
+    P5 --> P6
+    P6 --> P7
+    P7 --> P8
+    P7 --> P9
+    P8 --> P9
+    P9 --> P10
+    P10 --> P11
+```
 
-| Phase | Outstanding work |
-|---|---|
-| 0 — Documentation | Complete cross-document consistency review and verify bundled examples. |
-| 1 — Foundation | Verify clean-checkout startup and environment configuration. |
-| 2 — Authentication | Complete origin/CSRF and cross-user authorization audits. |
-| 3 — Ingestion | Audit circular and unresolved references, parser limits, and supported OpenAPI constructs. |
-| 4 — API Explorer | Verify request-body inspection, filtering, error states, unsupported constructs, and hostile-content handling. |
-| 5 — Compatibility | Complete paired baseline/candidate analyzer fixtures for every applicable documented rule. |
+Frontend implementation may proceed alongside its corresponding backend feature. The phase dependencies describe the order of domain capabilities rather than requiring all interface work to be postponed.
 
-These items must not be represented as completed until their respective checks have been performed.
+## 5. Definition of Done
 
----
+A feature is considered complete when:
 
-## 6. Phase 5 — Compatibility Analysis Engine
+- The relevant product acceptance criteria are satisfied.
+- Input validation and authorization are enforced server-side.
+- Loading, empty, success, error, and partial states are handled where applicable.
+- Unit tests cover meaningful domain behavior and edge cases.
+- Integration tests cover relevant API workflows.
+- The frontend behavior follows the Design specification.
+- Existing working functionality is preserved.
+- Documentation reflects the actual implementation.
+- No temporary secret, unsafe fallback, debug endpoint, or unreviewed test bypass remains.
 
-**Priority:** P0
-**Status:** Core implemented and integrated; final analyzer-fixture audit outstanding.
-
-### Scope
-
-The compatibility engine performs deterministic, directional comparisons between baseline and candidate OpenAPI specifications.
-
-**Comparison direction:**
-
-`BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`
-
-**Ruleset:**
-
-`CG-COMPAT-1.1`
-
-Implemented capabilities include:
-
-- Canonical operation matching.
-- Path, operation, parameter, request, response, and schema comparisons.
-- Deterministic finding identifiers and ordering.
-- Compatibility classifications and explanations.
-- Source JSON Pointers.
-- Affected-operation information.
-- Unsupported-feature diagnostics.
-- Partial-analysis reporting.
-
-### Verification record
-
-The latest complete backend test run, performed on 11 November 2026, reported:
-
-- 40 test files passed.
-- 442 tests passed.
-
-The mapping and finding-contract fixtures cover all 52 documented compatibility rule IDs.
-
-**Remaining limitation:** Mapping and finding-contract fixtures do not establish complete paired baseline/candidate analyzer coverage for every applicable rule. That audit remains outstanding.
-
-The engine must not be described as exhaustively verified until the paired analyzer fixtures have been completed.
+A completed implementation phase does not automatically mean every security, accessibility, deployment, or end-to-end acceptance requirement is complete.
 
 ---
 
-## 7. Phase 6 — Change-to-Test Traceability
+## 6. Phase 0 — Documentation and Scope
 
-**Priority:** P0
-
-**Status:** Completed and locally accepted on 11 November 2026.
-
-### Implemented scope
-
-**Reference impact analysis**
-
-- Reverse-reference impact analysis.
-- Directly and indirectly affected-operation identification.
-- Canonical operation-key preservation.
-- Bounded reference traversal.
-- Unresolved and circular reference diagnostics.
-
-**Test-case management**
-
-- Baseline-version-specific test cases.
-- Manual test-case creation and editing.
-- Canonical operation-key association.
-- Bounded path and query parameter inputs.
-- Structured response assertions.
-- Draft, approved, and archived lifecycle states.
-- Authenticated test-case APIs.
-- Server-side ownership and baseline validation.
-
-**Traceability and coverage**
-
-- Finding-to-operation association.
-- Baseline test-case retrieval.
-- Operation-complete coverage calculation.
-- Draft, approved, and archived case handling.
-- Comparison-level coverage projections.
-- Preservation of historical comparison findings.
-
-**Frontend integration**
-
-- Test-case library and editor.
-- Creation, editing, approval, and archival workflows.
-- Application navigation and routing.
-- Comparison coverage presentation.
-
-### Verification evidence
-
-**Backend**
-
-- 40 test files passed.
-- 442 tests passed.
-- Database-backed integration tests passed as part of the complete suite.
-
-**Frontend**
-
-- ESLint passed.
-- Vite production build passed.
-
-**Browser acceptance**
-
-- Authentication and project access verified.
-- Comparison findings inspected.
-- Manual test cases created and approved.
-- Comparison-level coverage verified against approved test cases.
-- Test-case library showed 2 approved cases, 0 drafts, and 0 archived cases.
-
-The verified sample comparison reported:
-
-| Coverage state | Findings |
-|---|---:|
-| Covered | 7 |
-| Draft-only | 0 |
-| Uncovered | 0 |
-| Unmapped | 0 |
-
-### Known limitations
-
-- Reference-impact analysis uses conservative operation-scope reference closure and may over-approximate impact.
-- Manual test-case creation is restricted to supported GET path operations.
-- Combined path and query parameter inputs are limited to 20 per test case.
-- Coverage represents test-case availability, not successful execution.
-
-
-
-**Phase 6 acceptance:** The implemented change-impact, test-case management, and coverage-projection functionality has passed its recorded local verification and browser acceptance.
-
-Regression execution is not included in this acceptance. It belongs to Phase 7.
-
----
-
-## 8. Phase 7 — Bounded Regression Runner
-
-**Priority:** P0
-**Status:** Not implemented.
+**Priority:** P0\
+**Status:** Documentation baseline established; consistency update in progress.
 
 ### Objective
 
-Execute approved baseline test cases against a trusted bundled candidate implementation and validate candidate responses against baseline response contracts.
+Maintain one coherent product, design, technical, architecture, API, data, compatibility, and security reference.
 
-### Implementation scope
+### Completed documentation work
 
-**Trusted execution**
+- [x] Product direction and scope established.
+- [x] Core API compatibility workflow documented.
+- [x] Baseline-to-candidate comparison direction defined.
+- [x] Technology stack documented.
+- [x] Data relationships documented.
+- [x] Backend endpoint contracts documented.
+- [x] Compatibility classifications and rules documented.
+- [x] Security boundaries documented.
+- [x] Demo Store fixtures documented.
+- [x] Implementation phases consolidated into one tracker.
 
-- Finalize and verify Demo Store fixtures.
-- Register trusted specification hashes and implementation profiles.
-- Support only explicitly approved fixture operations.
-- Use a server-controlled in-process execution adapter.
-- Reject arbitrary URLs, hostnames, ports, and network destinations.
+### Remaining review work
 
-**Test execution**
+- [ ] Verify every documented endpoint against the current route implementation.
+- [ ] Verify fixture hashes and runner eligibility.
+- [ ] Verify every documented resource limit against backend configuration.
+- [ ] Verify documentation links and repository paths.
+- [ ] Complete the final cross-document consistency review.
 
-- Execute approved test cases only.
-- Support bounded GET operations.
-- Construct requests from validated test-case inputs.
-- Enforce timeouts and response-size limits.
-- Evaluate explicit assertions.
-- Validate candidate responses against baseline response schemas.
+### Exit Criteria
 
-**Persistence**
+- All documents use the same comparison direction and ruleset.
+- Test cases are associated with baseline specification versions.
+- Comparison findings preserve their original ruleset.
+- Shared-schema impact and coverage semantics are documented consistently.
+- Unsupported functionality remains explicit.
+- AI remains optional and consent-gated.
+- The runner has a clearly defined execution boundary.
 
-- Implement TestRun storage.
-- Associate every run with an exact comparison.
-- Preserve baseline and candidate version identifiers.
-- Store bounded execution snapshots and individual results.
-- Support queued, running, completed, failed, partial, and interrupted states.
-- Recover unfinished runs safely.
+---
 
-### Initial execution limits
+## 7. Phase 1 — Application Foundation
+
+**Priority:** P0\
+**Status:** Core application foundation implemented; clean-checkout acceptance review remains.
+
+### Objective
+
+Provide the React frontend, Express backend, MongoDB integration, and initial application shell.
+
+### Repository and Environment
+
+- [x] Establish the ContractGuard repository.
+- [x] Separate frontend and backend applications.
+- [x] Configure JavaScript ES modules.
+- [x] Establish environment configuration.
+- [x] Configure Git and `.gitignore`.
+- [x] Establish dependency manifests and lockfiles.
+- [x] Establish development scripts.
+
+### Frontend
+
+- [x] Initialize React with Vite.
+- [x] Configure Tailwind CSS.
+- [x] Establish application entry points.
+- [x] Configure React Router.
+- [x] Establish TanStack Query.
+- [x] Implement the application shell.
+- [x] Configure the development API proxy.
+
+### Backend
+
+- [x] Initialize Express.
+- [x] Establish backend entry points.
+- [x] Configure MongoDB and Mongoose.
+- [x] Establish centralized error handling.
+- [x] Configure security middleware.
+- [x] Establish the common API response structure.
+- [x] Implement the health endpoint.
+
+### Remaining Verification
+
+- [ ] Verify startup from a clean checkout.
+- [ ] Verify missing and invalid environment configuration.
+- [ ] Verify MongoDB unavailable and reconnect behavior.
+- [ ] Verify all production startup requirements.
+
+### Milestone
+
+Working frontend, backend, and database foundation.
+
+---
+
+## 8. Phase 2 — Authentication and Project Management
+
+**Priority:** P0\
+**Status:** Core functionality implemented; complete security acceptance review remains.
+
+### Database Models
+
+- [x] User model.
+- [x] Project model.
+- [x] Ownership relationships.
+- [x] Database indexes.
+- [x] Mongoose validation.
+
+### Authentication
+
+- [x] User registration.
+- [x] Password hashing using bcrypt.
+- [x] Password verification.
+- [x] JWT generation and verification.
+- [x] HttpOnly authentication cookie.
+- [x] Login and logout.
+- [x] Current-user endpoint.
+
+### Security
+
+- [x] Authentication middleware.
+- [x] Project ownership checks.
+- [x] Security headers.
+- [x] Rate limiting.
+- [x] Request validation.
+- [x] Origin-protection middleware.
+- [ ] Complete production cookie and CSRF acceptance audit.
+- [ ] Complete cross-user authorization review across every resource type.
+
+### Project Management
+
+- [x] Create projects.
+- [x] List personal projects.
+- [x] Retrieve project details.
+- [x] Update project information.
+- [x] Delete projects with dependent-record handling.
+
+### Frontend
+
+- [x] Login screen.
+- [x] Registration screen.
+- [x] Protected application navigation.
+- [x] Projects workspace.
+- [x] Project creation and management.
+
+### Milestone
+
+Authenticated project workspace with backend-enforced ownership.
+
+---
+
+## 9. Phase 3 — OpenAPI Ingestion and Normalization
+
+**Priority:** P0\
+**Status:** Core implementation present; complete support-boundary audit remains.
+
+### File Upload
+
+- [x] Multipart uploads.
+- [x] Bounded upload handling.
+- [x] JSON support.
+- [x] YAML support.
+- [x] Upload-size enforcement.
+- [x] UTF-8 content validation.
+- [x] Duplicate upload detection.
+- [x] SHA-256 hashing of original uploaded bytes.
+
+### OpenAPI Processing
+
+- [x] Integrate OpenAPI parsing.
+- [x] Identify declared OpenAPI versions.
+- [x] Validate supported OpenAPI documents.
+- [x] Extract operation information.
+- [x] Preserve original source documents.
+- [x] Retain parser diagnostics and support warnings.
+- [x] Persist specification versions.
+
+### Reference Handling
+
+- [x] Supported internal-reference handling.
+- [x] JSON Pointer preservation.
+- [x] Reference-resolution information.
+- [ ] Complete circular-reference edge-case audit.
+- [ ] Complete unresolved-reference audit.
+- [ ] Verify all parser and reference resource limits.
+
+### Normalization
+
+- [x] Operation extraction.
+- [x] Canonical operation identifiers.
+- [x] Original API path preservation.
+- [x] Supported parameter extraction.
+- [x] Supported response extraction.
+- [x] Supported component extraction.
+- [ ] Complete supported-construct audit across accepted OpenAPI versions.
+
+### Verification
+
+The Demo Store v1 and v2 specifications have been used during the application workflow.
+
+Full acceptance still requires testing of malformed documents, unsupported constructs, resource-limit boundaries, and reference edge cases.
+
+### Milestone
+
+Working specification-ingestion pipeline with explicit support diagnostics.
+
+---
+
+## 10. Phase 4 — API Explorer
+
+**Priority:** P0\
+**Status:** Core workflows implemented and browser-verified; remaining acceptance checks are part of the release review.
+
+### Backend
+
+- [x] Retrieve extracted operations.
+- [x] Retrieve operation details.
+- [x] Retrieve reusable components.
+- [x] Resolve supported internal references.
+- [x] Return source JSON Pointers.
+- [x] Return reference-resolution information.
+
+### Frontend
+
+- [x] API operation list.
+- [x] Operation detail view.
+- [x] Method and path presentation.
+- [x] Component navigation.
+- [x] Reference browsing.
+- [x] Schema inspection.
+- [x] Response definition presentation.
+- [x] Source-location presentation.
+
+### Remaining Verification
+
+- [ ] Complete non-empty request-body edge-case review.
+- [ ] Verify method and path filtering.
+- [ ] Exercise unsupported-construct diagnostics.
+- [ ] Verify loading and error states.
+- [ ] Complete hostile-content rendering checks.
+- [ ] Complete external-reference and server-URL security checks.
+
+### Milestone
+
+Read-only API Explorer for supported specification structures.
+
+---
+
+## 11. Phase 5 — Compatibility Engine
+
+**Priority:** P0\
+**Status:** Core implemented and integrated; exhaustive paired analyzer verification remains open.
+
+### Objective
+
+Provide deterministic compatibility analysis between baseline and candidate OpenAPI specification versions.
+
+Comparison direction:
+
+`BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`
+
+Ruleset:
+
+`CG-COMPAT-1.1`
+
+### Engine Foundation
+
+- [x] Establish compatibility-analysis services.
+- [x] Define ruleset identifier.
+- [x] Define report contracts.
+- [x] Define finding identifiers.
+- [x] Define rule identifiers.
+- [x] Define classification structures.
+- [x] Define analysis-status structures.
+- [x] Establish deterministic finding ordering.
+
+### Operation Matching
+
+- [x] Canonical operation identity.
+- [x] Operation matching.
+- [x] Path-parameter normalization.
+- [x] Original path preservation.
+- [x] Conservative handling of ambiguous matches.
+- [x] Affected-operation information in findings.
+
+### Compatibility Rule Coverage
+
+The ruleset covers supported changes to:
+
+- Operations and paths.
+- Parameters.
+- Request bodies.
+- Response schemas.
+- Required and optional properties.
+- Data types and enums.
+- Supported schema constraints.
+- Security requirements.
+- Server metadata.
+- Documentation metadata.
+- Unsupported schema constructs.
+
+### Recorded Fixture and Test Coverage
+
+- [x] Mapping fixtures cover the documented normative rule identifiers.
+- [x] Finding-contract fixtures verify rule IDs and classifications.
+- [x] Stable finding identifiers are tested.
+- [x] Operation linkage is tested.
+- [x] JSON Pointer structures are tested.
+- [x] Summaries and rationales are tested.
+- [x] Unsupported diagnostics are covered.
+- [ ] Complete paired baseline/candidate analyzer fixtures for every applicable rule.
+- [ ] Complete exhaustive per-rule directional fixture verification.
+- [ ] Complete the final supported-schema normalization audit.
+
+The mapping and finding-contract matrix must not be represented as complete end-to-end analyzer coverage for every rule.
+
+### Acceptance Criteria
+
+- Supported rules produce deterministic findings.
+- Request and response compatibility directions are correct.
+- Findings contain rule identifiers, classifications, rationales, and source locations.
+- Unsupported constructs produce partial-analysis outcomes.
+- Ambiguous relationships are not silently guessed.
+- Paired analyzer fixtures demonstrate the expected behavior for applicable rules.
+
+### Milestone
+
+Compatibility-engine core implemented and integrated; final rule-level acceptance audit pending.
+
+---
+
+## 12. Phase 6 — Change-to-Test Traceability
+
+**Priority:** P0\
+**Status:** Core implementation integrated; remaining full release acceptance belongs to the system-wide verification phase.
+
+### Objective
+
+Connect compatibility findings to affected operations and test cases associated with the exact baseline specification version.
+
+### Reference Impact Analysis
+
+- [x] Reverse-reference analysis.
+- [x] Directly affected operation identification.
+- [x] Supported indirectly affected operation identification.
+- [x] Canonical operation-key matching.
+- [x] Shared-schema impact propagation.
+- [x] Source-location preservation.
+- [x] Unsupported-impact diagnostics.
+
+### Test Traceability
+
+- [x] Test cases linked to baseline specification versions.
+- [x] Test cases linked to canonical operation keys.
+- [x] Approved and draft test cases distinguished.
+- [x] Archived cases excluded from active coverage.
+- [x] Per-change coverage projection.
+- [x] Coverage summary calculation.
+- [x] Unmapped findings represented explicitly.
+
+### Test Case Management
+
+- [x] Test Case model.
+- [x] Test-case validator.
+- [x] Test-case service.
+- [x] Test-case controller.
+- [x] Test-case routes.
+- [x] Draft case creation.
+- [x] Draft editing.
+- [x] Approval transition.
+- [x] Archive transition.
+- [x] Test-case integration tests.
+
+### Verification
+
+Phase 6 implementation was integrated with the compatibility report workflow.
+
+Its functionality is included in the recorded backend suite and report/traceability testing.
+
+### Milestone
+
+Change-to-test traceability and test-case lifecycle integrated.
+
+---
+
+## 13. Phase 7 — Bundled Regression Runner
+
+**Priority:** P0\
+**Status:** Implemented; broader release-level execution verification remains part of Phase 10.
+
+### Objective
+
+Execute approved baseline test cases against trusted bundled candidate implementations and validate candidate responses against the baseline contract.
+
+### Fixture and Eligibility
+
+- [x] Establish trusted Demo Store fixture handling.
+- [x] Associate fixture eligibility with server-controlled data.
+- [x] Define supported bundled operation profiles.
+- [x] Prevent client-supplied execution target selection.
+- [x] Validate comparison and version relationships.
+
+### Runner
+
+- [x] Implement bounded regression execution.
+- [x] Validate approved test-case eligibility.
+- [x] Construct supported GET requests.
+- [x] Execute through the bundled implementation boundary.
+- [x] Reject unsupported operations.
+- [x] Enforce execution limits.
+- [x] Validate candidate responses against baseline response expectations.
+- [x] Evaluate explicit assertions.
+- [x] Persist result snapshots and run summaries.
+- [x] Preserve historical run information.
+
+### Execution Constraints
+
+The runner uses configured server-side limits for:
+
+- Maximum approved cases per run.
+- Concurrent runs.
+- Concurrent tests per run.
+- Per-test timeout.
+- Total run deadline.
+- Response size.
+- Stored evidence.
+- Validation diagnostic count.
+
+The current data-model baseline is:
 
 | Constraint | Limit |
 |---|---:|
@@ -246,320 +538,364 @@ Execute approved baseline test cases against a trusted bundled candidate impleme
 | Concurrent tests per run | 2 |
 | Per-test timeout | 5 seconds |
 | Total run deadline | 60 seconds |
-| Response body | 256 KiB |
+| Maximum response body | 256 KiB |
 | Stored evidence per result | 16 KiB |
 | Validation diagnostics per result | 50 |
 
-These limits must be enforced by the backend.
+### Verification
 
-### Frontend scope
+- [x] Regression execution is covered by backend tests.
+- [x] Run eligibility and persistence are covered by automated testing.
+- [ ] Complete full browser-driven regression workflow.
+- [ ] Complete interrupted-run recovery acceptance test.
+- [ ] Complete final execution-boundary security review.
 
-- Select eligible approved test cases.
-- Display execution eligibility and selection count.
-- Start a regression run.
-- Display progress and completion status.
-- Inspect individual results and validation diagnostics.
-- Review historical test runs.
+### Milestone
 
-### Acceptance criteria
-
-- Only approved baseline cases execute.
-- Only trusted bundled implementations are eligible.
-- Candidate responses are checked against baseline schemas.
-- Execution limits are enforced.
-- Results are persisted and linked to their comparison.
-- Arbitrary network execution is not possible through client inputs.
-
-**Milestone:** Working bounded regression runner.
+Controlled GET-only regression runner implemented.
 
 ---
 
-## 9. Phase 8 — Optional AI-Assisted Test Suggestions
+## 14. Phase 8 — AI-Assisted Test Suggestions
 
-**Priority:** P1
-**Status:** Not implemented.
+**Priority:** P1\
+**Status:** Implemented; targeted automated tests and live provider workflows verified.
 
 ### Objective
 
-Generate additional structured test suggestions for eligible synthetic Demo Store operations.
+Generate structured test-case suggestions for supported operations in the trusted synthetic Demo Store context.
 
-### Implementation scope
+### Provider Integration
 
-- Verify provider models, quotas, and data-use terms.
-- Configure backend-only provider credentials.
-- Restrict generation to approved synthetic context.
-- Present the provider-submission preview.
-- Require explicit user consent.
-- Validate generated output using the application's schemas.
-- Verify operation and parameter references.
-- Store suggestions as draft test cases.
-- Require human review and approval.
-- Handle provider errors, timeouts, and quota exhaustion.
+- [x] Integrate the official `@google/genai` JavaScript SDK.
+- [x] Configure the provider key on the backend.
+- [x] Configure model selection through backend environment settings.
+- [x] Handle missing provider configuration.
+- [x] Handle provider errors and quota conditions.
 
-### Security restrictions
+### Context and Consent
 
-- Do not submit arbitrary user-uploaded specifications.
-- Do not submit production data or credentials.
-- Do not allow AI to classify compatibility.
-- Do not allow AI to determine regression pass/fail.
-- Do not allow AI to approve its own suggestions.
-- Do not accept AI-generated executable code.
-- Keep core ContractGuard functionality independent of AI availability.
+- [x] Establish trusted synthetic fixture context.
+- [x] Restrict generation to supported operations.
+- [x] Construct selected-operation context.
+- [x] Generate provider-submission preview.
+- [x] Require explicit consent.
+- [x] Validate selected operation identity.
+- [x] Keep provider credentials server-side.
 
-**Milestone:** Optional, consent-gated AI test-suggestion workflow.
+### Structured Output
+
+- [x] Request structured suggestions.
+- [x] Validate provider output.
+- [x] Reject invalid or mismatched operation output.
+- [x] Validate required draft fields.
+- [x] Reject unsupported content.
+- [x] Prevent generated executable code from reaching the runner.
+
+### Persistence and Review
+
+- [x] Persist valid suggestions as draft test cases.
+- [x] Preserve AI source metadata.
+- [x] Keep AI drafts separate from approved cases.
+- [x] Require human review and approval.
+- [x] Preserve existing manual test cases.
+
+### Current Supported Operations
+
+| Operation ID | Method | Path |
+|---|---|---|
+| `listProducts` | GET | `/products` |
+| `getProduct` | GET | `/products/{productId}` |
+
+### Recorded Verification
+
+- 44 AI-focused tests passed across 5 test files.
+- The AI-focused tests are included within the complete backend suite, not additional to it.
+- Live generation succeeded for `listProducts`.
+- Live generation succeeded for `getProduct`.
+- Generated suggestions were persisted as draft test cases.
+- Existing approved manual test cases remained intact.
+
+The AI workflow is optional. Core compatibility and regression behavior does not depend on Gemini availability.
+
+### Milestone
+
+AI-assisted test suggestion workflow implemented and verified for the documented synthetic operations.
 
 ---
 
-## 10. Phase 9 — Frontend Completion
+## 15. Phase 9 — Frontend Completion
 
-**Priority:** P0
-**Status:** Core screens exist; complete end-to-end acceptance pending.
+**Priority:** P0\
+**Status:** Core screens and AI workflow integrated; complete end-to-end, responsive, and accessibility acceptance remains.
 
-### Remaining work
+### Frontend Integration
 
-- Finalize project and specification workflows.
-- Complete API Explorer acceptance checks.
-- Verify comparison creation and finding navigation.
-- Complete test-case management acceptance.
-- Verify every coverage state.
-- Integrate the regression-runner interface after Phase 7.
-- Integrate optional AI review after Phase 8.
-- Verify loading, empty, error, and partial-analysis states.
-- Check responsive layout, keyboard navigation, and visible focus.
-- Verify safe presentation of uploaded specification content.
+- [x] Authentication screens.
+- [x] Projects workspace.
+- [x] Specification upload and history.
+- [x] API Explorer.
+- [x] Comparison workflow.
+- [x] Compatibility finding presentation.
+- [x] Affected-operation and coverage presentation.
+- [x] Test Case Library.
+- [x] Test-case lifecycle controls.
+- [x] AI suggestion preview.
+- [x] AI suggestion review.
+- [x] Regression-run workflow and result views.
 
-### Acceptance criteria
+### Recorded Verification
 
-- Users can complete the implemented core workflows through the interface.
-- Backend responses remain the source of truth.
-- Coverage and execution results are clearly distinguished.
-- Unimplemented capabilities are not presented as available.
-- Navigation preserves project and comparison context.
+- [x] Frontend ESLint passed.
+- [x] Vite production build passed.
+- [x] AI suggestions were exercised for both supported operations.
+- [x] Generated drafts appeared in the Test Case Library.
+- [x] Existing manual approved cases remained present after refresh.
 
-**Milestone:** Complete v1 frontend workflows.
+### Remaining Acceptance
+
+- [ ] Complete primary browser-driven workflow from project creation through regression history.
+- [ ] Verify every page's loading, empty, error, and partial states.
+- [ ] Verify responsive layout at desktop, tablet, and mobile widths.
+- [ ] Complete keyboard-navigation audit.
+- [ ] Complete accessible dialog and form review.
+- [ ] Verify all technical content is rendered safely.
+- [ ] Verify navigation and context preservation across all workflows.
+
+### Milestone
+
+Complete v1 frontend experience with verified core workflows.
 
 ---
 
-## 11. Phase 10 — Comprehensive Testing and Security
+## 16. Phase 10 — Testing and Security Review
 
-**Priority:** P0
-**Status:** Pending comprehensive release review.
+**Priority:** P0\
+**Status:** Automated suite and selected security checks recorded; comprehensive release review remains.
 
-### Automated testing
+### 16.1 Backend Verification
 
-Verify:
+Recorded result:
 
-- Compatibility rules and directional correctness.
-- Operation matching and shared-reference impact.
-- Test-case validation and lifecycle transitions.
-- Regression request construction and response validation.
-- Test-run persistence and recovery.
-- AI output validation and consent enforcement.
+- 539 backend tests passed.
+- 54 backend test files passed.
 
-### Backend integration testing
+The backend suite covers the implemented application areas, including authentication, specifications, compatibility analysis, traceability, test-case management, regression execution, and AI suggestion workflows.
 
-Verify:
+### 16.2 AI Verification
 
-- Registration, login, logout, and authentication cookies.
-- Origin/CSRF protection.
-- Cross-user and cross-project access rejection.
-- Specification upload and duplicate detection.
-- Invalid and unsupported specification handling.
-- Comparison creation and retrieval.
-- Test-case creation, editing, approval, and archival.
-- Wrong-baseline rejection.
-- Coverage calculations.
-- Test-run execution and persistence when implemented.
+Recorded result:
 
-### Security testing
+- 44 AI-focused tests passed.
+- 5 AI-focused test files passed.
 
-Verify:
+These tests are a subset of the backend test suite.
 
-- Invalid and expired JWT rejection.
-- Untrusted-origin rejection.
-- Oversized upload rejection.
-- YAML alias and duplicate-key handling.
-- Excessive nesting and parser-resource limits.
-- External-reference network prevention.
-- Arbitrary server URL and execution destination rejection.
-- Ownership and mass-assignment protections.
-- Bounded response evidence.
-- AI consent and synthetic-context restrictions.
+### 16.3 Frontend Verification
 
-### Performance and compatibility benchmarks
+Recorded result:
 
-Measure:
+- ESLint passed.
+- Production build passed.
 
-- Compatibility classification precision and recall.
-- Operation matching correctness.
-- Shared-schema impact accuracy.
+### 16.4 Remaining Verification
+
+- [ ] Complete a fresh full-suite run against the final source state.
+- [ ] Complete cross-user ownership review for every resource route.
+- [ ] Complete cookie and CSRF/origin acceptance review.
+- [ ] Complete malicious-upload and parser-boundary review.
+- [ ] Complete external-reference and server-URL SSRF review.
+- [ ] Complete arbitrary execution-target rejection review.
+- [ ] Complete evidence-redaction review.
+- [ ] Complete interrupted-run recovery review.
+- [ ] Complete responsive and accessibility review.
+- [ ] Complete primary browser-driven end-to-end workflow.
+- [ ] Verify behavior when Gemini is not configured.
+- [ ] Verify behavior when Gemini returns invalid output.
+- [ ] Review dependency vulnerabilities.
+- [ ] Document the remaining compatibility support limitations.
+
+### 16.5 Compatibility Benchmarks
+
+Prepare a labelled baseline/candidate fixture suite and measure:
+
+- Breaking-change precision.
+- Breaking-change recall.
+- Non-breaking classification correctness.
 - Unsupported-feature detection.
-- Regression execution duration.
-- Maximum validated specification size and operation count.
+- Shared-schema impact accuracy.
+- Operation-matching correctness.
 
-Every benchmark must record its environment, application version, ruleset version, fixture count, methodology, and actual results.
+Every benchmark report must include:
 
-Do not invent performance or accuracy claims.
+- Application and ruleset version.
+- Runtime version.
+- Fixture count.
+- Environment.
+- Measurement methodology.
+- Actual observed results.
 
-### Acceptance criteria
+Performance and accuracy claims must not be invented.
 
-- Required automated tests pass.
-- Security-critical checks pass.
-- Compatibility findings are reproducible.
-- Performance claims are supported by measurements.
-- Known limitations are documented.
-- No unresolved critical security issue remains.
+### Milestone
 
-**Milestone:** Verified v1 release candidate.
-
----
-
-## 12. Phase 11 — CI, Deployment, and Release
-
-**Priority:** P0
-**Status:** Pending.
-
-### Continuous integration
-
-- Configure GitHub Actions.
-- Install dependencies from committed lockfiles.
-- Run frontend lint and production build.
-- Run backend unit and integration tests.
-- Run compatibility fixture tests.
-- Run selected end-to-end tests.
-- Fail the workflow when required checks fail.
-
-### Documentation
-
-Maintain consistency across:
-
-- README.
-- PRD.
-- Architecture.
-- Application flow.
-- Technical requirements.
-- Database schema.
-- API specification.
-- Compatibility rules.
-- Security review.
-- Implementation plan.
-- Demo fixture documentation.
-
-### Deployment
-
-- Select the deployment configuration.
-- Configure production MongoDB and environment variables.
-- Configure HTTPS and secure authentication cookies.
-- Build and serve the React frontend.
-- Verify same-origin API behavior.
-- Verify persistent database storage.
-- Test process restart and error recovery.
-- Run deployed application smoke tests.
-
-### Release acceptance
-
-- Verify all P0 requirements.
-- Pass required backend tests.
-- Pass frontend lint and production build.
-- Complete primary end-to-end workflows.
-- Complete security acceptance checks.
-- Verify setup and demonstration instructions.
-- Confirm no secrets are committed.
-- Verify operation from a clean repository checkout.
-
-**Milestone:** ContractGuard v1 release candidate.
+Verified v1 release candidate with documented limitations and completed security acceptance.
 
 ---
 
-## 13. Development and Git Workflow
+## 17. Phase 11 — CI, Deployment and Release
 
-### Feature development
+**Priority:** P0\
+**Status:** Pending release engineering.
 
-For each development batch:
+### 17.1 Continuous Integration
 
-1. Inspect the existing repository and relevant files.
-2. Understand dependencies, APIs, imports, exports, and calling conventions.
-3. Identify the required changes.
-4. Preserve existing working functionality.
-5. Implement logically related changes together.
-6. Provide complete replacement files for manual code changes.
-7. Write or update relevant tests.
-8. Run focused and full relevant tests.
-9. Run frontend lint and build when applicable.
-10. Inspect the final Git diff.
-11. Update documentation when implemented behavior changes.
+- [ ] Configure GitHub Actions.
+- [ ] Install dependencies using committed lockfiles.
+- [ ] Run frontend lint.
+- [ ] Run frontend production build.
+- [ ] Run backend unit tests.
+- [ ] Run backend integration tests.
+- [ ] Run compatibility fixture tests.
+- [ ] Run selected end-to-end tests.
+- [ ] Fail required workflows when checks fail.
 
-Do not rewrite unrelated modules or introduce redundant implementations.
+GitHub Actions will initially verify ContractGuard's own repository.
 
-### Git policy
+Customer-facing CI integrations are outside the current v1 scope.
 
-- `main` represents the verified project state.
-- Use clear, descriptive commit messages.
-- Inspect all changes before staging.
-- Do not overwrite unrelated user changes.
-- Do not commit or push without explicit authorization.
+### 17.2 Documentation
 
-Suggested commit messages:
+- [x] Establish public project README.
+- [x] Establish product requirements.
+- [x] Establish design documentation.
+- [x] Establish technical requirements.
+- [x] Establish architecture documentation.
+- [x] Establish application-flow documentation.
+- [x] Establish database schema documentation.
+- [x] Establish backend API documentation.
+- [x] Establish compatibility rules documentation.
+- [x] Establish security review documentation.
+- [x] Establish Demo Store fixture documentation.
+- [x] Establish the implementation tracker.
+- [x] Establish the documentation manifest.
+- [ ] Verify every documentation statement against the final source state.
+- [ ] Add verified product screenshots.
+- [ ] Complete a clean-checkout documentation and setup test.
 
-```text
-feat: add authentication and project management
-feat: implement OpenAPI ingestion
-feat: implement compatibility engine
-feat: add change-to-test traceability
-feat: implement bounded regression runner
-test: add compatibility regression fixtures
-docs: update implementation documentation
-```
+### 17.3 Deployment
 
-A phase is not committed or pushed merely because its source files have been prepared.
+- [ ] Select the production deployment configuration.
+- [ ] Configure production MongoDB.
+- [ ] Configure production environment variables.
+- [ ] Configure HTTPS.
+- [ ] Configure secure authentication cookies.
+- [ ] Build and serve the React production assets.
+- [ ] Verify same-origin API behavior.
+- [ ] Verify persistent database storage.
+- [ ] Verify process-restart behavior.
+- [ ] Verify optional AI configuration.
+- [ ] Run deployed application smoke tests.
 
----
+Durable user data must not depend on an ephemeral deployment filesystem.
 
-## 14. Final v1 Acceptance Criteria
+Free-tier hosting limitations must be disclosed.
 
-ContractGuard v1 is ready for release when:
+### 17.4 Release Preparation
 
-1. The application runs from a clean repository checkout.
-2. Users can register, authenticate, and manage projects.
-3. Supported OpenAPI specifications can be uploaded and explored.
-4. Specification versions remain immutable.
-5. Supported API changes are classified deterministically.
-6. Every documented compatibility rule has appropriate paired analyzer fixtures.
-7. Unsupported constructs produce explicit diagnostics.
-8. Shared-schema changes identify supported affected operations.
-9. Findings connect to the correct baseline test cases.
-10. Coverage uses operation-complete evaluation.
-11. Users can manage test cases through the supported lifecycle.
-12. Only approved baseline cases execute.
-13. Regression execution uses trusted bundled implementations.
-14. Candidate responses are validated against baseline schemas.
-15. Test runs preserve their comparison context and execution evidence.
-16. Resource limits and security controls are enforced.
-17. AI remains optional, consent-gated, and human-reviewed.
-18. Backend tests, frontend lint, builds, and primary end-to-end tests pass.
-19. Security acceptance checks pass.
-20. Known limitations and unsupported behavior are documented.
+- [ ] Complete all required P0 requirements.
+- [ ] Complete the comprehensive security review.
+- [ ] Verify the complete backend suite.
+- [ ] Verify frontend lint and build.
+- [ ] Complete primary end-to-end workflows.
+- [ ] Verify documentation against implementation.
+- [ ] Confirm no secrets are committed or exposed.
+- [ ] Verify the bundled fixtures.
+- [ ] Prepare a reproducible demonstration.
+- [ ] Verify a clean repository checkout.
+- [ ] Review final repository changes before release.
 
-## 15. Progress Management
+### Milestone
 
-Use these status markers consistently:
-
-- `[x]` Implemented and verified.
-- `[ ]` Not implemented or not verified.
-- `[~]` Partially implemented or awaiting specific verification.
-
-Update this document when a milestone is verified.
-
-Every completed milestone must retain:
-
-- Actual implementation status.
-- Automated test results.
-- Build and lint results, where applicable.
-- Remaining acceptance checks.
-- Known limitations.
-
-The objective is a maintainable, technically defensible application supported by reproducible evidence—not an inflated checklist of unverified features.
+ContractGuard v1 release candidate.
 
 ---
 
-**End of Implementation Plan**
+## 18. Central Development Tracker
+
+This table is the central status summary. Detailed tasks and evidence remain in their respective phase sections.
+
+| Phase | Deliverable | Priority | Current status |
+|---|---|---|---|
+| 0 | Documentation and scope | P0 | Documentation baseline updated; final source cross-check pending |
+| 1 | Application foundation | P0 | Core implemented; clean-checkout review pending |
+| 2 | Authentication and projects | P0 | Core implemented; full security acceptance pending |
+| 3 | OpenAPI ingestion | P0 | Core implemented; support-boundary audit pending |
+| 4 | API Explorer | P0 | Core implemented and browser-verified; remaining checks pending |
+| 5 | Compatibility engine | P0 | Core implemented; exhaustive paired analyzer audit pending |
+| 6 | Change-to-test traceability | P0 | Implemented and integrated |
+| 7 | Regression runner | P0 | Implemented; release-level verification pending |
+| 8 | AI test suggestions | P1 | Implemented; targeted tests and live workflows verified |
+| 9 | Frontend completion | P0 | Core workflows integrated; end-to-end and accessibility review pending |
+| 10 | Testing and security | P0 | Automated verification recorded; comprehensive release review pending |
+| 11 | CI and deployment | P0 | Pending |
+
+## 19. Architectural Decision Log
+
+| ID | Decision | Status | Rationale |
+|---|---|---|---|
+| ADR-001 | JavaScript modular monolith | Accepted | Keeps domain responsibilities separated without distributed infrastructure |
+| ADR-002 | MongoDB and Mongoose | Accepted | Supports versioned documents, reports, test cases, and run records |
+| ADR-003 | Scalar parser with ContractGuard compatibility engine | Accepted | Separates standards parsing from product-specific compatibility policy |
+| ADR-004 | Ajv through supported schema adapters | Accepted | Keeps response validation aware of supported OpenAPI schema behavior |
+| ADR-005 | Bundled GET-only regression environment | Accepted | Prevents arbitrary-target execution and limits side effects |
+| ADR-006 | Optional Gemini integration | Accepted | Adds test ideation without making AI a core dependency |
+| ADR-007 | Same-origin production frontend and API | Accepted | Simplifies cookie authentication and CORS |
+| ADR-008 | In-process bounded execution | Accepted | Avoids distributed queue infrastructure for current product scale |
+
+## 20. Scope-Control Policy
+
+The following remain outside the current v1 architecture unless a concrete product requirement justifies reconsideration:
+
+- TypeScript.
+- Redis.
+- BullMQ.
+- Kafka.
+- Docker as a runtime prerequisite.
+- Kubernetes.
+- Microservices.
+- Distributed job orchestration.
+- RAG and vector databases.
+- AI agents.
+- Socket.IO.
+- Arbitrary external API execution.
+- Customer-facing GitHub App integration.
+- Organization management.
+- Billing and subscription infrastructure.
+
+New technologies must solve a concrete requirement and justify their maintenance, security, and implementation cost.
+
+## 21. Deferred Enhancements
+
+| Enhancement | Priority | Reason |
+|---|---|---|
+| Arbitrary external API execution | P2 | Requires a separate network isolation and SSRF security design |
+| GitHub App integration | P2 | Not required for the core workflow |
+| Customer-facing CI deployment blocking | P2 | Requires a separate integration and policy model |
+| Team collaboration | P2 | Current ownership model is single-user |
+| Organization administration | P2 | Outside v1 scope |
+| Distributed test execution | P2 | Current bounded in-process runner is sufficient for the product's present scope |
+| Additional AI-supported operations | P1 | Requires trusted synthetic context and operation-specific validation |
+
+## 22. Change Control
+
+When scope, rules, dependencies, or architecture change:
+
+1. Update the relevant documentation in the same change as the implementation.
+2. Record significant architecture trade-offs in the decision log.
+3. Update acceptance criteria and status.
+4. Add or modify automated tests.
+5. Update README limitations when visible product behavior changes.
+6. Preserve historical ruleset and test-run semantics.
+
+A documentation status must not be changed to complete until the associated implementation or review evidence exists.

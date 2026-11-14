@@ -1,11 +1,11 @@
-
 {
   "product": "ContractGuard",
-  "manifestVersion": "1.0.0",
-  "blueprintVersion": "1.1.0",
-  "status": "Active implementation — Phase 6 change-to-test traceability implemented and verified; Phase 5 paired analyzer-fixture audit remains open",
-  "lastUpdated": "2026-11-11",
-  "totalFiles": 17,
+  "manifestVersion": "1.1.0",
+  "documentationVersion": "1.2",
+  "status": "Active development; core application and Phase 8 AI workflow implemented; release verification pending",
+  "lastUpdated": "2026-11-14",
+  "inventoryScope": "Root documentation and supporting example files. Frontend/backend source files, package manifests, and lockfiles are maintained separately.",
+  "totalTrackedFiles": 17,
   "directories": [
     "docs",
     "examples"
@@ -14,22 +14,22 @@
     {
       "path": "README.md",
       "type": "documentation",
-      "purpose": "Project overview, scope, technology baseline, implementation status, and documentation index"
+      "purpose": "Public project overview, features, architecture summary, technology stack, setup, verification, and limitations"
     },
     {
       "path": ".env.example",
       "type": "configuration-template",
-      "purpose": "Environment variable template with safe placeholders"
+      "purpose": "Environment variable template containing safe placeholders"
     },
     {
       "path": ".gitignore",
       "type": "configuration",
-      "purpose": "Git exclusion rules"
+      "purpose": "Excludes local environment files, dependencies, build outputs, and generated artifacts from version control"
     },
     {
       "path": "MANIFEST.json",
       "type": "manifest",
-      "purpose": "Documentation package inventory, technology baseline, and implementation status"
+      "purpose": "Documentation and supporting fixture inventory with project status metadata"
     }
   ],
   "documentation": [
@@ -47,49 +47,154 @@
   "examples": [
     {
       "path": "examples/README.md",
-      "purpose": "Demo Store fixture documentation and expected compatibility changes"
+      "type": "documentation",
+      "purpose": "Demo Store fixture roles, expected comparison behavior, regression execution boundary, and fixture integrity requirements"
     },
     {
       "path": "examples/demo-store-v1.yaml",
-      "purpose": "Baseline Demo Store OpenAPI specification",
+      "type": "openapi-fixture",
+      "role": "baseline",
       "openapiVersion": "3.0.3",
-      "apiVersion": "1.0.0"
+      "apiVersion": "1.0.0",
+      "purpose": "Synthetic baseline consumer contract for compatibility analysis and regression test definition"
     },
     {
       "path": "examples/demo-store-v2.yaml",
-      "purpose": "Candidate Demo Store OpenAPI specification",
+      "type": "openapi-fixture",
+      "role": "candidate",
       "openapiVersion": "3.0.3",
-      "apiVersion": "2.0.0"
+      "apiVersion": "2.0.0",
+      "purpose": "Synthetic candidate provider contract containing intentional API contract changes"
     }
   ],
   "technologyBaseline": {
     "language": "JavaScript",
-    "runtime": "Node.js 24.x",
-    "frontend": "React 19.x",
-    "buildTool": "Vite 8.x",
-    "frontendRouter": "React Router 8.x",
-    "styling": "Tailwind CSS 4.x",
-    "serverState": "TanStack Query 5.x",
-    "forms": "React Hook Form 7.x",
-    "backend": "Express 5.x",
+    "moduleSystem": "ECMAScript Modules",
+    "runtime": "Node.js",
+    "frontend": "React",
+    "buildTool": "Vite",
+    "routing": "React Router",
+    "serverState": "TanStack Query",
+    "styling": "Tailwind CSS",
+    "backend": "Express",
     "database": "MongoDB",
-    "odm": "Mongoose 9.x",
-    "passwordHashing": "bcrypt 6.x",
-    "inputValidation": "Zod 4.x",
-    "openApiParser": "@scalar/openapi-parser",
-    "schemaValidation": "Ajv 8.x",
+    "odm": "Mongoose",
+    "validation": [
+      "Zod",
+      "Ajv"
+    ],
+    "openapiParser": "@scalar/openapi-parser",
     "yamlParser": "yaml",
-    "unitTesting": "Vitest",
-    "apiIntegrationTesting": "Supertest",
-    "e2eTesting": "Playwright",
-    "compatibilityRuleset": "CG-COMPAT-1.1"
+    "aiProvider": "Google Gemini Developer API",
+    "aiSdk": "@google/genai",
+    "testing": [
+      "Vitest",
+      "Supertest"
+    ]
+  },
+  "compatibility": {
+    "direction": "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER",
+    "ruleset": "CG-COMPAT-1.1",
+    "classifications": [
+      "BREAKING",
+      "POTENTIALLY_BREAKING",
+      "NON_BREAKING",
+      "INFORMATIONAL",
+      "UNSUPPORTED"
+    ],
+    "analysisStatuses": [
+      "COMPLETE",
+      "PARTIAL",
+      "FAILED"
+    ]
+  },
+  "aiIntegration": {
+    "provider": "Google Gemini",
+    "sdk": "@google/genai",
+    "contextBoundary": "Trusted synthetic Demo Store operation context",
+    "supportedOperations": [
+      {
+        "operationId": "listProducts",
+        "method": "GET",
+        "path": "/products"
+      },
+      {
+        "operationId": "getProduct",
+        "method": "GET",
+        "path": "/products/{productId}"
+      }
+    ],
+    "requiresExplicitConsent": true,
+    "generatedTestCaseStatus": "DRAFT",
+    "humanApprovalRequired": true,
+    "executableModelOutput": false
   },
   "implementationStatus": {
-    "documentation": "Core documentation established and updated to reflect Phase 6 completion. Cross-document consistency review remains ongoing.",
-    "applicationSourceCode": "Phases 1–6 core application functionality implemented and integrated. Phase 6 backend tests, frontend lint, production build, and browser acceptance verified. Subsequent phases remain pending.",
-    "compatibilityEngine": "CG-COMPAT-1.1 core implemented and integrated. The complete backend suite passed 40 test files and 442 tests on 2026-11-11. Mapping and finding-contract fixtures cover all 52 documented rule IDs. Paired baseline/candidate analyzer fixtures for every applicable rule remain an outstanding verification requirement.",
-    "changeImpactAndTraceability": "Phase 6 implemented and locally accepted on 2026-11-11. Reference-impact analysis, test-case management, lifecycle APIs, baseline-version association, and comparison-level coverage projections passed the recorded backend, frontend, and browser acceptance checks.",
-    "regressionRunner": "Not implemented. Planned for Phase 7.",
-    "aiIntegration": "Not implemented. Planned for Phase 8."
+    "applicationSourceCode": "Implemented",
+    "applicationFoundation": "Core implemented",
+    "authenticationAndProjects": "Core implemented",
+    "openapiIngestion": "Core implemented; support-boundary audit pending",
+    "apiExplorer": "Core implemented and browser-verified",
+    "compatibilityEngine": "Core implemented; exhaustive paired analyzer verification pending",
+    "changeToTestTraceability": "Implemented and integrated",
+    "regressionRunner": "Implemented",
+    "aiIntegration": "Implemented; targeted automated tests and live workflows verified",
+    "frontend": "Core workflows integrated; full end-to-end and accessibility review pending",
+    "securityReview": "Automated verification recorded; comprehensive release review pending",
+    "continuousIntegration": "Pending",
+    "productionDeployment": "Pending"
+  },
+  "verification": {
+    "backend": {
+      "testFilesPassed": 54,
+      "testsPassed": 539,
+      "status": "Passed in the recorded verification run"
+    },
+    "aiFocusedTests": {
+      "testFilesPassed": 5,
+      "testsPassed": 44,
+      "includedInBackendTotal": true,
+      "status": "Passed in the recorded targeted verification run"
+    },
+    "frontend": {
+      "eslint": "Passed",
+      "productionBuild": "Passed"
+    },
+    "liveAiWorkflows": [
+      {
+        "operationId": "listProducts",
+        "status": "Generated successfully"
+      },
+      {
+        "operationId": "getProduct",
+        "status": "Generated successfully"
+      }
+    ],
+    "draftPersistence": {
+      "aiGeneratedDraftsVerified": 5,
+      "existingApprovedManualCasesRetained": 2,
+      "status": "Verified in the recorded workflow"
+    },
+    "limitations": [
+      "Recorded test results do not guarantee future source revisions remain verified.",
+      "The AI-focused test count is included in the backend test total.",
+      "Full release-level end-to-end, security, accessibility, and deployment acceptance remain pending."
+    ]
+  },
+  "releaseReadiness": {
+    "readyForProduction": false,
+    "remainingAreas": [
+      "Final compatibility analyzer fixture audit",
+      "Full browser-driven end-to-end workflow",
+      "Comprehensive security acceptance review",
+      "Responsive and accessibility review",
+      "Continuous integration",
+      "Production deployment and smoke testing",
+      "Final documentation-to-source verification"
+    ]
+  },
+  "license": {
+    "selected": false,
+    "status": "No open-source license has been specified"
   }
 }

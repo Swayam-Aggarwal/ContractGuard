@@ -2,7 +2,12 @@ import express from "express";
 
 import createDiffReportController from
   "../controllers/diffReport.controller.js";
-import createTestRunRouter from "./testRun.routes.js";
+
+import createTestRunRouter from
+  "./testRun.routes.js";
+
+import createAiTestSuggestionRouter from
+  "./aiTestSuggestion.routes.js";
 
 import requireProjectOwnership from
   "../middleware/requireProjectOwnership.middleware.js";
@@ -26,12 +31,13 @@ import {
   listDiffReportsQuerySchema,
 } from "../validators/diffReport.validator.js";
 
-const createDiffReportRouter = () => {
+const createDiffReportRouter = (config) => {
   const router = express.Router({
     mergeParams: true,
   });
 
-  const controller = createDiffReportController();
+  const controller =
+    createDiffReportController();
 
   router.post(
     "/",
@@ -47,6 +53,13 @@ const createDiffReportRouter = () => {
     requireProjectOwnership,
     validateQuery(listDiffReportsQuerySchema),
     controller.listDiffReports
+  );
+
+  // The AI router is nested under a specific comparison report.
+  // It inherits projectId and reportId, and validates ownership itself.
+  router.use(
+    "/:reportId/ai-test-suggestions",
+    createAiTestSuggestionRouter(config)
   );
 
   router.use(

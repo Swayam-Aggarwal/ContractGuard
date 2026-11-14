@@ -50,6 +50,38 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z
     .literal("30m")
     .default("30m"),
+
+  // AI integration is optional. The application must boot without a key.
+  GEMINI_API_KEY: z
+    .string()
+    .trim()
+    .max(1000)
+    .default(""),
+
+  /*
+   * Empty or whitespace-only values use the default model.
+   * Non-empty values must match one of the explicitly supported models.
+   */
+  GEMINI_MODEL: z.preprocess(
+    (value) => {
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      const normalized = value.trim();
+
+      return normalized === ""
+        ? undefined
+        : normalized;
+    },
+
+    z
+      .enum([
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
+      ])
+      .default("gemini-3.8-flash")
+  ),
 });
 
 const parseEnv = (environment = process.env) => {

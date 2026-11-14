@@ -1,309 +1,458 @@
-
 # Security, Privacy and Reliability Review
 
-**Product:** ContractGuard
-**Version:** 1.1
-**Status:** Security requirements baseline; implementation verification pending
+**Product:** ContractGuard\
+**Document version:** 1.2\
+**Document status:** Security design and verification baseline\
+**Last updated:** 14 November 2026
+
+---
 
 ## 1. Security Objectives
 
-ContractGuard accepts user-supplied API specifications and stores authentication and project data.
+ContractGuard accepts user-supplied OpenAPI documents and stores authentication, project, comparison, test-case, and test-run data.
 
-The primary security objectives are:
+Its primary security objectives are:
 
 - Protect user accounts and project-owned data.
-- Prevent unauthorized access to specifications, reports, and test cases.
-- Prevent unsafe file parsing and resource exhaustion.
-- Prevent arbitrary network requests originating from imported documents.
-- Protect credentials and sensitive application data.
+- Enforce authorization at the backend.
+- Prevent unsafe specification parsing and resource exhaustion.
+- Prevent imported documents from causing arbitrary network requests.
+- Restrict regression execution to trusted bundled implementations.
 - Prevent AI output from becoming executable or authoritative.
-- Preserve the integrity of historical comparison and test records.
+- Protect provider credentials and authentication secrets.
+- Avoid exposing sensitive request, response, or stored data.
+- Preserve reliable historical records.
 
-This document defines security requirements. It does not claim that a penetration test or security certification has been completed.
+This document defines security requirements and review criteria. It is not a claim of independent penetration testing, security certification, or production security approval.
 
 ## 2. Assets and Trust Boundaries
 
-### 2.1 Assets
+### 2.1 Protected Assets
 
-- User credentials and password hashes.
+- User email addresses and password hashes.
 - JWT signing secret.
-- Optional AI provider API key.
-- Uploaded OpenAPI documents.
-- Parsed and normalized specifications.
-- Project and comparison records.
-- Test cases and associated coverage information.
-- Future regression execution results.
-- Application logs and configuration.
+- Gemini API key.
+- Uploaded OpenAPI source documents.
+- Parsed and normalized specification data.
+- Project and ownership records.
+- Compatibility reports and findings.
+- Test cases and approval states.
+- Regression execution inputs and results.
+- AI-generated suggestions and generation metadata.
+- Application configuration and logs.
 
 ### 2.2 Trust Boundaries
 
 1. Browser to Express API.
 2. Uploaded file to parser and normalizer.
 3. OpenAPI document to internal reference resolver.
-4. Authenticated user to project-owned resources.
-5. AI provider request and response boundary.
-6. Backend services to MongoDB.
+4. Authenticated principal to project-owned resources.
+5. AI context builder to Gemini provider.
+6. Gemini provider response to application validators.
+7. Regression runner to the bundled Demo Store implementation.
+8. Express application to MongoDB.
 
-All incoming data must be treated as untrusted, including uploaded documents, filenames, request parameters, AI output, and stored values.
+All externally supplied data must be treated as untrusted, including:
 
-## 3. Threats and Required Controls
+- HTTP request data.
+- File names and uploaded file contents.
+- OpenAPI schemas and references.
+- User-provided labels and descriptions.
+- AI provider responses.
+- Persisted values originally derived from external input.
 
-| Threat | Risk | Required Control |
+## 3. Threat Model and Required Controls
+
+| Threat | Potential impact | Required control |
 |---|---|---|
-| Broken object-level authorization | Access to another user's project or report | Ownership-scoped queries and authorization tests |
-| Broken authentication | Account takeover | bcrypt hashing, JWT verification, HttpOnly cookie, login rate limiting |
-| CSRF | Unauthorized cookie-authenticated actions | SameSite cookie, strict Origin validation for unsafe methods |
-| XSS | Script execution through user-controlled content | React text rendering and no unsafe HTML rendering |
-| NoSQL injection | Manipulation of database queries | Zod validation and explicit database query construction |
-| Malicious upload | Parser abuse or memory exhaustion | File-size limits, content validation and bounded parsing |
-| YAML complexity attack | Excessive expansion or parsing cost | Disable aliases and enforce document limits |
-| Remote `$ref` SSRF | Unauthorized server-side network access | Reject external references |
-| Runner SSRF | Access to internal services | Planned runner restricted to bundled server-controlled fixtures |
-| Resource exhaustion | Excessive CPU or memory consumption | Upload, operation, finding, and execution limits |
-| AI prompt injection | Unsafe or misleading suggestions | Restricted context, structured output validation and human review |
-| AI data exposure | Private specifications sent externally | Explicit consent and synthetic data restriction |
-| Secret leakage | Credentials exposed in source or logs | Environment variables, redacted logs and secret rotation |
-| Dependency compromise | Vulnerable or malicious packages | Lockfile, dependency review and vulnerability monitoring |
+| Broken object-level authorization | Access to another user's projects or reports | Ownership-scoped queries and cross-user authorization tests |
+| Broken authentication | Account compromise | bcrypt hashing, signed expiring JWT, HttpOnly cookie, login rate limiting |
+| CSRF | Unwanted cookie-authenticated state changes | SameSite cookie, strict Origin validation for unsafe methods, same-origin production model |
+| XSS | Script execution through displayed data | React text rendering, no unsafe HTML rendering, safe handling of uploaded descriptions |
+| NoSQL injection | Manipulated database queries | Zod allowlists and no direct spreading of raw request objects into MongoDB queries |
+| Malicious or oversized uploads | Memory exhaustion or parser abuse | 1 MiB cap, content validation, bounded parsing and in-memory handling |
+| YAML complexity or alias abuse | Excessive parsing work | YAML parser limits, alias restrictions, nesting and node-count bounds |
+| Remote `$ref` SSRF | Requests to private or internal hosts | External references rejected; supported internal JSON Pointer references only |
+| Test-runner SSRF | Requests to arbitrary network destinations | No arbitrary target URL; server-controlled bundled implementation |
+| Resource exhaustion | CPU, memory, or execution saturation | Document, operation, finding, test-count, concurrency, timeout, and response-size limits |
+| AI prompt injection or malformed output | Unsafe or irrelevant suggestions | Trusted synthetic context, structured output validation, operation matching, human approval |
+| AI data exposure | Confidential specifications submitted to provider | Explicit consent, selected synthetic operation context, no secrets or production data |
+| Secret leakage | API keys or JWTs exposed | Server-only environment variables, `.env` exclusion, redacted logs, secret rotation |
+| Dependency compromise | Vulnerable or malicious dependency | Lockfiles, dependency review, vulnerability triage, maintained packages |
+| Historical record tampering | Incorrect audit or regression evidence | Immutable specification versions, completed reports, and completed test-run snapshots |
 
-Relevant security guidance: [OWASP API Security](https://owasp.org/API-Security/).
+The controls address security risks relevant to API applications, including broken object-level authorization, broken authentication, unrestricted resource consumption, SSRF, and unsafe consumption of external data.
+
+Reference: [OWASP API Security Top 10](https://owasp.org/API-Security/)
 
 ## 4. Authentication Security
 
-Authentication uses bcrypt for password hashing and JWTs stored in HttpOnly cookies.
+### 4.1 Password Storage
+
+Passwords are hashed using bcrypt.
 
 Requirements:
 
-- Passwords must never be stored in plaintext.
-- Password hashes must never be returned through API responses.
-- Use an appropriate bcrypt cost factor for the deployment environment.
-- JWT signing secrets must come from environment configuration.
-- The application must not use a default production JWT secret.
-- JWT signatures, expiration, and configured claims must be verified.
-- JWTs must never be stored in browser local storage or session storage.
-- Authentication cookies must always use `HttpOnly`.
-- Cookies must use `SameSite=Lax` or an appropriately restrictive setting.
-- `Secure` must be enabled in production.
-- Login and registration endpoints must be rate-limited.
-- Logout must clear the cookie using matching cookie attributes.
-- Expired or invalid tokens must not grant access to protected resources.
+- Hash passwords before persistence.
+- Use asynchronous hashing and verification functions.
+- Use a suitable work factor for the deployment environment.
+- Never store plaintext passwords.
+- Never log submitted passwords or stored hashes.
+- Never return `passwordHash` in normal API responses.
+- Avoid exposing whether a specific account exists through authentication error messages.
 
-The initial target access-token lifetime is 30 minutes. The actual configured lifetime must be documented in the deployment configuration.
+### 4.2 JWT Authentication
 
-V1 does not require a refresh-token database or token blacklist.
+JWTs are used for authenticated application requests.
 
-## 5. Authorization Security
+Requirements:
 
-ContractGuard uses ownership-based authorization. Team-level role-based access control is outside the initial scope.
+- Signing secrets are stored server-side.
+- Tokens must be signed and verified using the configured algorithm.
+- Token expiration is enforced.
+- Missing, malformed, invalid, or expired tokens are rejected.
+- Authentication failures must not reveal token verification details.
 
-Every project operation must be scoped to the authenticated user.
+The access token is transported through the `cg_access` cookie.
 
-Every child-resource operation must verify ownership through its parent project.
+### 4.3 Cookie Security
 
-The backend must never trust an ownership field supplied by the client.
+Required cookie properties:
 
-Required authorization tests:
+- `HttpOnly` enabled.
+- `SameSite=Lax` or stricter where compatible with the application.
+- `Secure` enabled in production.
+- Consistent path and expiration settings.
+- Cookie cleared using matching attributes during logout.
 
-- User A cannot read User B's project.
-- User A cannot update or delete User B's project.
-- User A cannot access User B's specification versions.
-- User A cannot compare versions belonging to another user.
-- User A cannot retrieve another user's comparison reports.
-- User A cannot access or modify another user's test cases.
-- User A cannot access another user's test-run records when that functionality is implemented.
-- Guessing a MongoDB ObjectId must not bypass ownership checks.
+JWTs must not be stored in localStorage or sessionStorage.
 
-Return safe `404` responses for inaccessible resources where appropriate to avoid disclosing whether another user's resource exists.
+The configured token lifetime must remain short and be enforced by the backend.
 
-## 6. Upload and Parser Security
+### 4.4 Authentication Rate Limiting
 
-Uploaded specifications are untrusted input.
+Registration and login endpoints must apply appropriate rate limits.
+
+Rate-limit responses must not reveal credentials or internal account details.
+
+## 5. Authorization and Ownership
+
+ContractGuard uses an authenticated personal-project ownership model.
+
+Every project belongs to one user.
+
+Every child-resource operation must verify ownership through the parent project.
 
 Required controls:
 
-- Accept only supported JSON and YAML formats.
-- Validate content instead of trusting file extensions or browser-provided MIME types.
-- Enforce a maximum upload size of 1 MiB.
-- Parse bounded files in memory.
-- Do not write user-uploaded files to arbitrary filesystem locations.
-- Reject malformed documents before accepting them as valid versions.
+- Derive the authenticated user ID from the verified token.
+- Scope project queries using the authenticated owner.
+- Validate that specification versions belong to the selected project.
+- Validate that comparison reports belong to the selected project.
+- Validate that test cases belong to the report's baseline version.
+- Validate that test runs belong to the selected report and project.
+- Never accept client-supplied ownership as authoritative.
+- Avoid disclosing whether another user's resource exists.
+
+Authorization tests must cover attempts to read, modify, approve, archive, or delete resources owned by another user.
+
+## 6. Request and Input Validation
+
+The backend validates request bodies, route parameters, query parameters, and upload metadata.
+
+Requirements:
+
+- Use explicit request schemas.
+- Validate ObjectIds before database access.
+- Reject or deliberately strip unknown high-risk fields.
+- Prevent mass assignment.
+- Apply length and array-size limits.
+- Validate resource relationships at the service layer.
+- Avoid passing raw request objects directly into MongoDB queries or update operators.
+- Keep server-derived fields outside client control.
+
+Security-sensitive server-derived fields include:
+
+- `ownerId`
+- `contentHash`
+- `runnerProfile`
+- `rulesetVersion`
+- `direction`
+- `analysisStatus`
+- Final test results.
+- Execution target.
+- Provider configuration.
+
+## 7. Upload and Parser Security
+
+### 7.1 Upload Restrictions
+
+Accepted formats:
+
+- JSON.
+- YAML.
+
+Maximum original specification size:
+
+`1 MiB`
+
+Requirements:
+
+- Validate size before parsing.
+- Inspect file content rather than trusting extensions alone.
+- Parse in memory.
 - Do not execute uploaded content.
-- Disable YAML alias expansion.
-- Reject unsupported YAML tags and duplicate mapping keys.
-- Enforce document-depth and parsed-node limits.
-- Bound path entries and operation counts.
-- Bound internal reference resolution depth.
-- Bound normalized document size.
-- Calculate SHA-256 from the original uploaded bytes.
-- Preserve original document content separately from normalized data.
-- Never render uploaded raw HTML as trusted application content.
+- Do not write uploads to a durable deployment filesystem.
+- Reject malformed documents.
+- Preserve bounded parser diagnostics.
+- Avoid rendering raw HTML from uploaded descriptions.
 
-Relevant initial limits:
+### 7.2 Parser Resource Limits
 
-| Limit | Maximum |
-|---|---:|
-| Upload size | 1 MiB |
-| Path entries | 250 |
-| Operations | 500 |
-| Document nesting depth | 100 |
-| Parsed nodes | 50,000 |
-| Internal reference depth | 20 |
-| Normalized representation | 8 MiB |
-| Comparison findings | 5,000 |
+The backend applies limits to:
 
-Limits must be enforced by the backend rather than relying on frontend validation.
+- Path entries.
+- Operation count.
+- Document depth.
+- Parsed node count.
+- Internal reference depth.
+- Normalized representation size.
+- Comparison finding count.
 
-## 7. Reference-Resolution Security
+These limits prevent excessively large or complex documents from consuming unbounded resources.
 
-OpenAPI specifications may contain references to other document locations.
+### 7.3 Reference Resolution
 
-ContractGuard must support only the implemented internal reference subset.
+- Only supported internal references may be resolved.
+- External `$ref` URLs are rejected.
+- The resolver must not make network requests.
+- Cyclic and excessive-depth references must be detected.
+- Unresolved references must produce explicit diagnostics.
+- Unsupported relevant reference behavior must result in partial analysis.
 
-Requirements:
+### 7.4 OpenAPI Server Definitions
 
-- Resolve supported internal JSON Pointer references.
-- Reject external HTTP and HTTPS references.
-- Do not resolve external filesystem references.
-- Detect circular references.
-- Enforce a maximum reference depth.
-- Preserve unresolved-reference diagnostics.
-- Do not silently ignore unsupported reference behavior.
-- Mark affected analysis as partial where necessary.
+OpenAPI `servers` entries are specification data.
 
-External `$ref` fetching is disabled to prevent Server-Side Request Forgery (SSRF).
+They are not execution instructions.
 
-Declared OpenAPI `servers` URLs must never be fetched automatically.
+The backend and regression runner must never fetch uploaded server URLs.
 
-## 8. Regression Runner Security
+## 8. Regression Runner Isolation
 
-The regression runner is a planned capability and must follow these controls when implemented.
-
-It is restricted to the bundled Demo Store implementation.
+The regression runner is restricted to the bundled Demo Store implementation.
 
 Required controls:
 
-- No user-supplied target URL.
-- No user-controlled hostname, IP address, port, or redirect destination.
-- No arbitrary network destinations.
-- Only approved GET test cases may execute.
-- Every test case must belong to the comparison's baseline specification version.
-- Every selected test case must be approved.
-- Execution targets must be selected by the server through a trusted fixture registry.
-- Request construction must use validated operation definitions and bounded parameters.
-- No arbitrary request headers, authentication credentials, or cookies.
-- Response bodies must be bounded before validation.
-- Execution concurrency and timeouts must be enforced server-side.
-- Test execution must not accept executable scripts or shell commands.
+- No arbitrary target URL.
+- No user-supplied hostname, IP address, or port.
+- No client-controlled network destination.
+- No execution against uploaded `servers` definitions.
+- No arbitrary redirects to external hosts.
+- GET operations only.
+- Request construction from approved baseline operation definitions.
+- Validated path and query parameters only.
+- No arbitrary request headers.
+- No user-provided authentication credentials.
+- No executable scripts or shell commands.
+- Candidate response validation against the baseline contract.
 
-Planned initial execution limits:
+The runner uses a server-controlled in-process adapter for known bundled candidate handlers.
 
-| Limit | Maximum |
+### 8.1 Execution Limits
+
+The initial execution limits are:
+
+| Resource | Limit |
 |---|---:|
 | Approved test cases per run | 20 |
-| Concurrent runs | 2 |
+| Concurrent test runs | 2 |
 | Concurrent tests per run | 2 |
 | Per-test timeout | 5 seconds |
 | Total run deadline | 60 seconds |
-| Response body | 256 KiB |
+| Maximum response body | 256 KiB |
 | Stored evidence per result | 16 KiB |
-| Validation diagnostics per test | 50 |
+| Validation diagnostics per result | 50 |
 
-The runner must validate candidate responses against baseline response schemas.
+These limits must be enforced server-side.
 
-It must never become a general-purpose external API proxy.
+A timeout or unsupported response-validation condition must not be represented as a successful test.
+
+### 8.2 Historical Integrity
+
+Test-run results preserve the comparison, specification versions, test-case snapshots, and result evidence used during execution.
+
+Updating or archiving a test case must not rewrite completed historical results.
+
+Unfinished runs must not silently appear successful after a process restart.
 
 ## 9. AI Privacy and Safety
 
-AI-assisted functionality is optional and planned for a later phase.
+### 9.1 Provider
 
-Required controls:
+The optional integration uses Google's Gemini Developer API through the official `@google/genai` JavaScript SDK.
 
-- AI functionality must be disabled when provider configuration is unavailable.
-- Provider API keys must remain on the backend.
-- Explicit user consent is required before external data submission.
-- The interface must preview the sanitized context being submitted.
-- Unpaid AI-provider requests must be restricted to approved synthetic demonstration data.
-- Arbitrary user-uploaded specifications must not be sent.
-- Production API contracts and actual production request/response data must not be sent.
-- Credentials, secrets, and sensitive headers must be excluded.
-- Provider responses must be validated using Zod.
-- Malformed or unsupported AI results must be rejected.
-- Generated test cases must remain drafts until human approval.
-- AI must not decide compatibility classifications or execution results.
-- AI output must never be executed as code.
-- Provider failures must not disable deterministic application functionality.
+The Gemini API key is configured and accessed on the backend only.
 
-Provider pricing, free-tier eligibility, quota limits, and data-use terms must be rechecked when the AI integration is implemented.
+### 9.2 Eligible Context
+
+The AI integration is limited to trusted synthetic Demo Store context.
+
+Currently supported operations:
+
+- `listProducts` — GET `/products`
+- `getProduct` — GET `/products/{productId}`
+
+The backend constructs the provider context from the trusted fixture registry.
+
+The client cannot provide arbitrary prompts or substitute an unrelated operation.
+
+### 9.3 Consent
+
+Before provider submission:
+
+1. The selected operation is validated.
+2. The backend builds a sanitized context.
+3. The frontend displays the provider-submission preview.
+4. The user explicitly consents.
+5. The backend revalidates the request before calling Gemini.
+
+No provider request occurs without explicit consent.
+
+### 9.4 Data Restrictions
+
+Do not submit:
+
+- Production API specifications.
+- Customer or personal information.
+- Production request or response payloads.
+- Credentials.
+- Authentication headers.
+- API keys.
+- Confidential business information.
+- Private project documents.
+
+Only the bounded synthetic context required for the selected operation may be submitted.
+
+### 9.5 Provider Terms
+
+Google's Gemini Developer API free-tier terms may allow submitted content to be used to improve Google's products.
+
+Provider terms, data-use policies, quotas, and model availability may change.
+
+The application must not assume that free-tier provider submissions are confidential.
+
+References:
+
+- [Gemini API documentation](https://ai.google.dev/gemini-api/docs)
+- [Gemini API pricing and data-use information](https://ai.google.dev/gemini-api/docs/pricing)
+- [Gemini API terms](https://ai.google.dev/gemini-api/terms)
+
+### 9.6 AI Output Validation
+
+AI output is untrusted data.
+
+Requirements:
+
+- Validate the structured output using the backend schema.
+- Validate the selected operation association.
+- Validate request parameters and assertions.
+- Reject unknown or unsupported fields.
+- Reject malformed or oversized responses.
+- Persist valid suggestions as drafts.
+- Require human approval before execution.
+- Never execute generated code.
+- Never allow AI output to choose an execution target.
+
+### 9.7 AI Rate Limiting
+
+AI generation requests are rate-limited per authenticated user.
+
+The current middleware uses a limit of three generation requests per hour.
+
+Provider quota exhaustion and request rate limiting must be communicated separately from deterministic compatibility or regression failures.
+
+AI failure must not disable core product functionality.
 
 ## 10. Operational Security
 
-Requirements:
+The application uses security middleware and deployment configuration to reduce common application risks.
 
-- Enable Helmet security headers.
-- Use strict request body limits.
-- Apply endpoint-specific rate limits to sensitive operations.
-- Validate the request origin for unsafe cookie-authenticated methods.
-- Do not allow arbitrary origins in any future cross-origin deployment.
-- Keep secrets in environment variables.
-- Exclude environment files containing credentials from Git.
-- Redact authorization headers, cookies, passwords, and API keys from logs.
-- Do not expose internal stack traces in production responses.
-- Use safe and consistent error responses.
-- Review dependencies before upgrading them.
-- Maintain committed package lockfiles.
-- Review dependency vulnerabilities before releases.
+Requirements include:
 
-The intended production architecture is same-origin: Express serves the frontend and API.
+- Helmet security headers.
+- Configured CORS allowlist during development.
+- Same-origin API deployment in production.
+- Strict Origin validation for unsafe methods.
+- Request-body size limits.
+- Authentication rate limits.
+- AI endpoint rate limits.
+- Server-only environment secrets.
+- `.env` exclusion from version control.
+- Redaction of authorization headers, cookies, API keys, and sensitive values in logs.
+- Safe production error responses.
+- Dependency review before releases.
+- Secret rotation after suspected exposure.
 
-## 11. Reliability and Data Integrity
+Production error responses must not expose stack traces, MongoDB queries, provider credentials, or internal filesystem paths.
 
-Requirements:
+## 11. Reliability Controls
 
-- MongoDB connection failures must be surfaced through application health checks.
-- A successful response must not be returned before required persistence operations succeed.
-- Specification versions must remain immutable.
-- Completed comparison findings must remain unchanged.
-- Historical execution results must remain unchanged once finalized.
-- Database relationships must be checked explicitly by application services.
-- Resource limits must be applied before expensive processing.
-- Partial or interrupted operations must never be represented as completed successfully.
-- Future unfinished test runs must be marked `INTERRUPTED` after unexpected process restarts.
-- Logs must contain sufficient diagnostic information without exposing sensitive data.
+- MongoDB connection failure must be surfaced through safe readiness and health information.
+- Database writes must complete before the application reports successful persistence.
+- Specification versions are immutable after creation.
+- Completed comparison findings are immutable.
+- Completed test-run evidence is immutable.
+- AI requests use bounded execution and output size.
+- Parser and regression limits are enforced server-side.
+- Incomplete runs are marked `INTERRUPTED` when safely recovered after a process restart.
+- Provider failures do not affect deterministic product capabilities.
 
-## 12. Security Verification Checklist
+## 12. Verification Status
 
-Before public deployment, verify:
+The following engineering evidence has been recorded:
 
-- [ ] No secrets exist in committed source or frontend build output.
-- [ ] JWT cookie flags are correct in production.
-- [ ] JWT expiration and verification are enforced.
-- [ ] Unsafe methods validate trusted request origins.
+| Area | Recorded evidence |
+|---|---|
+| Authentication | Automated authentication and password-hashing tests |
+| Ownership | Project and resource ownership integration coverage |
+| Specification validation | Parser, upload, and validation test coverage |
+| Compatibility | Deterministic analyzer and report-contract tests |
+| Test management | Test-case lifecycle and validation coverage |
+| AI consent | Preview, authentication, consent, and missing-configuration route tests |
+| AI output | Structured output and operation-validation tests |
+| Frontend | ESLint and production build passed in the recorded verification run |
+
+This evidence does not replace a full security acceptance review.
+
+## 13. Security Verification Checklist
+
+Before a public production release, verify:
+
+- [ ] No secrets exist in source files, Git history, or frontend build output.
+- [ ] Production JWT cookie flags are correct.
+- [ ] Unsafe requests enforce Origin validation.
 - [ ] Authentication endpoints are rate-limited.
-- [ ] All project and child-resource routes enforce ownership.
-- [ ] Cross-user resource access tests pass.
-- [ ] Invalid and oversized uploads are rejected.
-- [ ] YAML aliases and unsafe constructs are handled safely.
-- [ ] External `$ref` references are never fetched.
-- [ ] Uploaded server URLs are never executed.
-- [ ] No arbitrary execution target can be supplied.
-- [ ] AI consent and synthetic-data restrictions are enforced when AI is implemented.
-- [ ] AI output cannot execute code or select an execution target.
-- [ ] Logs and error responses do not expose secrets.
-- [ ] Parser and database resource limits are enforced.
-- [ ] Planned runner limits are enforced before runner release.
+- [ ] Every resource route enforces project ownership.
+- [ ] Invalid and oversized files are rejected.
+- [ ] YAML complexity and alias restrictions are enforced.
+- [ ] External `$ref` requests are prevented.
+- [ ] Uploaded server URLs are never fetched.
+- [ ] Arbitrary regression targets are impossible.
+- [ ] Only approved eligible GET tests execute.
+- [ ] Test-run count and timeout limits are enforced.
+- [ ] AI preview and consent are enforced.
+- [ ] Only trusted synthetic context reaches the provider.
+- [ ] AI output cannot execute code or select a target URL.
+- [ ] Error responses and logs do not expose secrets.
 - [ ] Dependency vulnerabilities have been reviewed.
-- [ ] README documentation accurately describes security limitations.
+- [ ] Production environment configuration has been checked.
+- [ ] Deployment persistence and restart behavior have been tested.
 
-## 13. Review Status
+## 14. Review Status
 
-The controls in this document are security requirements.
+The security controls in this document define the intended protection model and release requirements.
 
-They must not be considered verified merely because they are documented or implemented in source code.
+Automated tests demonstrate selected controls, but the application has not been independently penetration-tested or security-certified.
 
-Verification requires corresponding automated tests or documented manual review.
-
-The implementation tracker must distinguish between:
-
-- Designed.
-- Implemented.
-- Tested.
-- Verified.
+A public production release requires completion and documentation of the remaining security verification checklist.

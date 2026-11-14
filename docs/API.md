@@ -1,69 +1,69 @@
+# ContractGuard Backend API Specification
 
-# ContractGuard — Backend API Specification
-
-**Document:** API Specification
-**Version:** 1.2
-**API version:** v1
-**Base path:** `/api/v1`
-**Protocol:** HTTP/HTTPS
-**Data format:** JSON and multipart/form-data
-**Authentication:** JWT through an HttpOnly cookie
+**Product:** ContractGuard\
+**Document version:** 1.2\
+**API version:** v1\
+**Base path:** `/api/v1`\
+**Format:** JSON over HTTP, with multipart uploads for OpenAPI documents\
+**Authentication:** JWT through an HttpOnly cookie\
+**Last updated:** 14 November 2026
 
 ---
 
-## 1. Introduction
+## 1. Purpose
 
-This document defines the backend API contract for ContractGuard.
+This document describes the REST API exposed by the ContractGuard backend.
 
-ContractGuard exposes a RESTful application API used by its React frontend to manage authentication, projects, OpenAPI specification versions, compatibility comparisons, test cases, and related resources.
-
-The backend is implemented using Express 5 and JavaScript ES modules. MongoDB and Mongoose provide persistent storage.
+It defines the endpoint inventory, authentication model, request and response conventions, validation boundaries, and principal application workflows.
 
 This API is separate from the OpenAPI specifications uploaded by users for compatibility analysis.
 
-The primary API responsibilities are:
+The documented endpoints represent ContractGuard's application API. The OpenAPI documents stored within the application describe external API contracts being analyzed.
 
-- Account registration and authentication.
-- Project creation and management.
-- OpenAPI specification ingestion and version management.
-- API operation and component exploration.
-- Compatibility comparison creation and retrieval.
-- Reverse-reference impact analysis.
-- Baseline-version test-case management.
-- Change-to-test coverage projection.
-
-Regression-run execution and AI-assisted test generation are subsequent implementation milestones and are not presented as available API endpoints in this specification.
-
-## 2. API conventions
+## 2. API Conventions
 
 ### 2.1 Base URL
 
-Local development:
+Development example:
 
 `http://localhost:5000/api/v1`
 
-Production:
+Production requests use the same-origin `/api/v1` path.
 
-`https://YOUR_APPLICATION_DOMAIN/api/v1`
+### 2.2 Authentication
 
-During development, the Vite frontend proxies `/api` requests to the Express backend.
+Protected endpoints require the `cg_access` HttpOnly authentication cookie.
 
-In production, Express serves the frontend and backend API from the same origin.
+The cookie is issued during successful registration or login and cleared during logout.
 
-### 2.2 HTTP methods
+Authentication requirements:
 
-| Method | Purpose |
-|---|---|
-| `GET` | Retrieve resources |
-| `POST` | Create resources or perform controlled state transitions |
-| `PATCH` | Partially update eligible resources |
-| `DELETE` | Delete resources |
+- The backend verifies the JWT signature and expiration.
+- The authenticated principal is derived by backend middleware.
+- The token is not accepted from request bodies, query parameters, or URL paths.
+- The frontend does not read or expose the JWT.
+- Protected resource queries enforce authenticated project ownership.
+- Client-supplied `ownerId` values are never trusted.
+- Passwords and password hashes are never returned in normal API responses.
 
-GET requests must not perform state-changing operations.
+### 2.3 Request Origin and CSRF Protection
 
-### 2.3 JSON success response
+Because authentication is cookie-based, state-changing requests require origin protection.
 
-Successful JSON responses use the following structure:
+For unsafe HTTP methods (`POST`, `PUT`, `PATCH`, and `DELETE`):
+
+- Validate the request origin against the configured application origin.
+- Reject untrusted origins.
+- Reject `Origin: null`.
+- Do not allow state changes through GET requests.
+- Do not rely exclusively on cookie `SameSite` settings as a CSRF defense.
+- Use a validated Referer fallback only where the application configuration explicitly supports it.
+
+Registration, login, logout, uploads, comparisons, test-case transitions, AI submissions, and test-run creation must follow the applicable origin-protection rules.
+
+### 2.4 Success Response
+
+Successful responses use a consistent envelope:
 
 ```json
 {
@@ -72,11 +72,13 @@ Successful JSON responses use the following structure:
 }
 ```
 
-A `meta` property may be included when pagination or additional response metadata is required.
+The `data` object contains the resource or operation result.
 
-### 2.4 JSON error response
+Pagination or additional response metadata may be supplied where required.
 
-The standard error structure is:
+### 2.5 Error Response
+
+Error responses use the following structure:
 
 ```json
 {
@@ -89,786 +91,313 @@ The standard error structure is:
 }
 ```
 
-The `details` property contains bounded field-level validation information when available.
+Error-handling requirements:
 
-Production errors must never expose:
+- Error codes remain stable for documented conditions.
+- Messages explain the failure without exposing internal implementation details.
+- Details may identify invalid fields and safe validation messages.
+- Stack traces, credentials, provider keys, internal filesystem paths, raw database queries, and secret configuration are never returned.
+- Unexpected errors are handled by centralized backend error middleware.
 
-- Stack traces.
-- Database credentials.
-- JWT values.
-- Provider API keys.
-- Internal filesystem paths.
-- Raw database queries.
-- Sensitive internal implementation details.
-
-### 2.5 HTTP status codes
+### 2.6 HTTP Status Conventions
 
 | Status | Meaning |
 |---|---|
-| `200 OK` | Successful read, update, or reused resource |
-| `201 Created` | New resource successfully created |
-| `202 Accepted` | Reserved for future asynchronous operations |
-| `204 No Content` | Successful operation without response content |
-| `400 Bad Request` | Invalid request or validation failure |
-| `401 Unauthorized` | Authentication required or invalid |
-| `403 Forbidden` | Request rejected by an access or security policy |
-| `404 Not Found` | Resource does not exist or is not accessible |
-| `409 Conflict` | Duplicate resource or conflicting lifecycle state |
-| `413 Payload Too Large` | Request exceeds configured size limits |
-| `415 Unsupported Media Type` | Unsupported uploaded file format |
-| `422 Unprocessable Entity` | Semantically unsupported operation or document |
-| `429 Too Many Requests` | Rate limit exceeded |
-| `500 Internal Server Error` | Unexpected server error |
-| `503 Service Unavailable` | Required dependency unavailable |
+| `200` | Successful read, update, or state transition |
+| `201` | Resource successfully created |
+| `202` | Asynchronous or bounded operation accepted |
+| `204` | Successful operation without a response body |
+| `400` | Malformed or invalid request |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated request rejected by an access or security policy |
+| `404` | Resource not found or not accessible |
+| `409` | Duplicate resource or conflicting state |
+| `413` | Upload or request exceeds configured size |
+| `415` | Unsupported media type or file format |
+| `422` | Semantically unsupported document or operation |
+| `429` | Request rate limit exceeded |
+| `500` | Unexpected server error |
+| `503` | Required service or provider unavailable |
 
-## 3. Authentication and security
-
-### 3.1 Authentication mechanism
-
-ContractGuard uses JWT authentication through an HttpOnly cookie.
-
-Cookie name:
-
-`cg_access`
-
-Cookie properties:
-
-| Property | Configuration |
-|---|---|
-| HttpOnly | Enabled |
-| Secure | Enabled in production |
-| SameSite | `lax` |
-| Path | `/api/v1` |
-| Maximum age | 30 minutes |
-
-The JWT uses the configured signing secret and the HS256 algorithm.
-
-The token includes the configured issuer, audience, and authenticated user subject.
-
-### 3.2 Authentication requirements
-
-- The frontend must not store the JWT in localStorage or sessionStorage.
-- The frontend must not read or manually decode the HttpOnly cookie.
-- Protected endpoints must verify the JWT.
-- The backend derives the user ID from the authenticated principal.
-- The client cannot submit or override `ownerId`.
-- Every protected project and child-resource request must verify ownership.
-
-### 3.3 Request-origin protection
-
-ContractGuard uses request-origin validation for state-changing HTTP methods.
-
-Protected unsafe methods:
-
-- POST
-- PUT
-- PATCH
-- DELETE
-
-The origin middleware:
-
-1. Reads the Origin header when provided.
-2. Validates the origin format.
-3. Rejects `Origin: null`.
-4. Uses Referer as a fallback when Origin is absent.
-5. Compares the resulting origin with the configured `APP_ORIGIN`.
-6. Rejects requests that do not match the configured application origin.
-
-Actual origin-rejection error:
-
-`ORIGIN_NOT_ALLOWED`
-
-Read-only GET, HEAD, and OPTIONS requests do not require this origin validation.
-
-### 3.4 Ownership protection
-
-The backend applies authenticated-user ownership checks to:
-
-- Projects.
-- Specification versions.
-- Comparison reports.
-- Test cases.
-- Other project-owned resources.
-
-A resource ID alone is never sufficient authorization.
-
-Where appropriate, inaccessible resources return the same safe not-found response as nonexistent resources.
-
-## 4. Endpoint inventory
+## 3. Endpoint Inventory
 
 All paths in this section are relative to `/api/v1`.
 
-### 4.1 Health endpoint
+### 3.1 Health
 
-| Method | Endpoint | Authentication |
-|---|---|---|
-| GET | `/health/` | No |
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| GET | `/health` | Return application liveness and safe dependency status | No |
 
-Purpose:
+The health endpoint must not disclose:
 
-Checks whether the ContractGuard API is responding.
+- Environment variables.
+- Database credentials.
+- Provider API keys.
+- Internal filesystem paths.
+- Stack traces.
+- Detailed infrastructure configuration.
 
-Successful response:
+### 3.2 Authentication
 
-```json
-{
-  "success": true,
-  "data": {
-    "status": "ok",
-    "service": "ContractGuard API"
-  }
-}
-```
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| POST | `/auth/register` | Register a new account | No |
+| POST | `/auth/login` | Authenticate and issue cookie | No |
+| POST | `/auth/logout` | Clear authentication cookie | Yes |
+| GET | `/auth/me` | Retrieve current account information | Yes |
 
-The health endpoint must not expose sensitive environment or infrastructure information.
-
-### 4.2 Authentication endpoints
-
-| Method | Endpoint | Authentication |
-|---|---|---|
-| POST | `/auth/register` | No |
-| POST | `/auth/login` | No |
-| POST | `/auth/logout` | No |
-| GET | `/auth/me` | Yes |
-
-#### Register
-
-`POST /auth/register`
-
-Request:
+#### Registration Request
 
 ```json
 {
   "email": "developer@example.com",
-  "password": "ExamplePassword123!",
+  "password": "example-password",
   "displayName": "Developer"
 }
 ```
 
-`displayName` is optional.
-
-Backend responsibilities:
-
-1. Validate the request.
-2. Normalize the email address.
-3. Validate password requirements.
-4. Hash the password using the application's configured password-hashing implementation.
-5. Create the user.
-6. Issue the authentication cookie.
-7. Return a safe public user representation.
-
-Successful response:
-
-`201 Created`
-
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "USER_OBJECT_ID",
-      "email": "developer@example.com",
-      "displayName": "Developer",
-      "createdAt": "2026-11-11T10:00:00.000Z"
-    }
-  }
-}
-```
-
-Duplicate email:
-
-`409 Conflict`
-
-Error code:
-
-`DUPLICATE_RESOURCE`
-
-#### Login
-
-`POST /auth/login`
-
-Request:
+#### Login Request
 
 ```json
 {
   "email": "developer@example.com",
-  "password": "ExamplePassword123!"
+  "password": "example-password"
 }
 ```
 
-Successful response:
+Successful authentication sets the `cg_access` cookie.
 
-`200 OK`
+The response must not contain:
 
-The backend issues the `cg_access` cookie.
+- Plaintext password.
+- Password hash.
+- Raw JWT.
+- Authentication signing secret.
 
-Invalid credentials:
+`GET /auth/me` returns only safe account information.
 
-`401 Unauthorized`
+Logout clears the authentication cookie using matching cookie configuration attributes.
 
-Error code:
+### 3.3 Projects
 
-`AUTH_REQUIRED`
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| GET | `/projects` | List projects owned by the authenticated user | Yes |
+| POST | `/projects` | Create a personal project | Yes |
+| GET | `/projects/:projectId` | Retrieve an owned project | Yes |
+| PATCH | `/projects/:projectId` | Update project name or description | Yes |
+| DELETE | `/projects/:projectId` | Delete a project and its dependent records | Yes |
 
-The response uses a generic authentication failure message.
-
-#### Logout
-
-`POST /auth/logout`
-
-Purpose:
-
-Clears the `cg_access` authentication cookie using the configured cookie attributes.
-
-Successful response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Logged out successfully."
-  }
-}
-```
-
-The current route clears the cookie without requiring an authenticated JWT.
-
-#### Get current user
-
-`GET /auth/me`
-
-Requires authentication.
-
-Returns the current authenticated account's public information.
-
-Response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "USER_OBJECT_ID",
-      "email": "developer@example.com",
-      "displayName": "Developer",
-      "createdAt": "2026-11-11T10:00:00.000Z"
-    }
-  }
-}
-```
-
-Password hashes and JWT values are never returned.
-
-## 5. Project endpoints
-
-All project endpoints require authentication.
-
-### 5.1 Endpoint inventory
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/projects` | List authenticated user's projects |
-| POST | `/projects` | Create a project |
-| GET | `/projects/:projectId` | Retrieve a project |
-| PATCH | `/projects/:projectId` | Update an owned project |
-| DELETE | `/projects/:projectId` | Delete an owned project |
-
-### 5.2 List projects
-
-`GET /projects`
-
-Returns projects belonging to the authenticated user.
-
-Response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "projects": []
-  }
-}
-```
-
-### 5.3 Create project
-
-`POST /projects`
-
-Request:
+#### Create Project Request
 
 ```json
 {
   "name": "Demo Store API",
-  "description": "API compatibility and regression testing workspace."
+  "description": "API compatibility and regression-testing workspace."
 }
 ```
 
-Validation:
-
-- Name is required.
-- Name must not exceed 80 characters.
-- Description must not exceed 500 characters.
-- Unknown request fields are rejected.
-
-The backend derives project ownership from the authenticated user.
-
-Successful response:
-
-`201 Created`
+#### Update Project Request
 
 ```json
 {
-  "success": true,
-  "data": {
-    "project": {
-      "id": "PROJECT_OBJECT_ID",
-      "name": "Demo Store API",
-      "slug": "demo-store-api",
-      "description": "API compatibility and regression testing workspace.",
-      "createdAt": "2026-11-11T10:00:00.000Z",
-      "updatedAt": "2026-11-11T10:00:00.000Z"
-    }
-  }
-}
-```
-
-### 5.4 Retrieve project
-
-`GET /projects/:projectId`
-
-Returns the requested project after verifying ownership.
-
-### 5.5 Update project
-
-`PATCH /projects/:projectId`
-
-Request example:
-
-```json
-{
-  "name": "Demo Store API Updated",
+  "name": "Demo Store API",
   "description": "Updated project description."
 }
 ```
 
-At least one valid field must be provided.
+Rules:
 
-Only the project owner can update the project.
+- The server derives ownership from the authenticated principal.
+- The client cannot submit or override `ownerId`.
+- Project queries are scoped to the authenticated owner.
+- Duplicate owner-scoped slugs return a conflict response.
+- Project deletion follows the implemented dependent-record deletion workflow.
+- The backend must complete the required persistence operation before reporting success.
 
-### 5.6 Delete project
+### 3.4 Specification Uploads and Versions
 
-`DELETE /projects/:projectId`
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| POST | `/projects/:projectId/specifications` | Upload an OpenAPI document | Yes |
+| GET | `/projects/:projectId/specifications` | List specification versions | Yes |
+| GET | `/specifications/:specVersionId` | Retrieve specification details | Yes |
+| GET | `/specifications/:specVersionId/operations` | List extracted operations | Yes |
+| GET | `/specifications/:specVersionId/operations/:operationKey` | Retrieve operation details | Yes |
 
-The current implementation performs project deletion together with dependent project records inside a MongoDB transaction.
+#### Upload Contract
 
-The service attempts to remove associated dependent collections before removing the project itself.
-
-Successful response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "project": {},
-    "message": "Project deleted successfully."
-  }
-}
-```
-
-Deletion is not a soft-delete operation in the current Phase 5 implementation.
-
-Historical retention and permanent deletion policies must therefore be considered together when changing this behavior.
-
-## 6. Specification management endpoints
-
-### 6.1 Endpoint inventory
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/projects/:projectId/specifications` | Upload an OpenAPI specification |
-| GET | `/projects/:projectId/specifications` | List specification versions |
-| GET | `/specifications/:specVersionId` | Retrieve a specification version |
-
-All endpoints require authentication and appropriate project/resource ownership checks.
-
-### 6.2 Upload specification
-
-`POST /projects/:projectId/specifications`
-
-Content type:
-
-`multipart/form-data`
+The upload endpoint accepts `multipart/form-data`.
 
 Required file field:
 
 `file`
 
-Optional text field:
+Additional required field:
 
 `label`
 
-Supported extensions:
+Accepted formats:
 
-- `.json`
-- `.yaml`
-- `.yml`
+- JSON.
+- YAML.
 
-Maximum file size:
+Maximum original uploaded document size:
 
 `1 MiB`
 
-Additional limits:
-
-- Exactly one uploaded file.
-- At most one text field.
-- Bounded multipart field size.
-- UTF-8 text decoding is enforced.
-- Invalid UTF-8 files are rejected.
-
-If `label` is omitted, the service uses the document's OpenAPI `info.version` as the default label.
-
-The uploaded filename and MIME type are not accepted as proof that the document is valid.
-
-### 6.3 Upload processing
-
-The backend performs the following operations:
+The backend must:
 
 1. Authenticate the user.
-2. Validate project ownership.
-3. Process the bounded multipart request.
-4. Read the uploaded file buffer.
-5. Decode UTF-8 content.
-6. Determine the supported format from its extension.
-7. Parse and validate the OpenAPI document.
-8. Calculate the SHA-256 content hash.
-9. Check for duplicate content in the project.
-10. Check for duplicate version labels.
-11. Validate the project again inside the transaction.
-12. Persist the immutable specification version.
-13. Update project activity.
-14. Return the public specification summary.
+2. Verify project ownership.
+3. Validate the upload size.
+4. Inspect and parse the uploaded content.
+5. Validate the OpenAPI document and supported version.
+6. Apply parser and normalization resource limits.
+7. Resolve supported internal references.
+8. Reject external reference fetching.
+9. Calculate SHA-256 from the original uploaded bytes.
+10. Detect duplicate project-scoped content.
+11. Preserve the original source text.
+12. Persist parsing and support diagnostics.
+13. Assign the runner profile through the trusted fixture registry.
+14. Return a safe specification-version response.
 
-External `$ref` resources are not fetched.
+The client must not supply or override server-derived fields such as:
 
-Uploaded OpenAPI server declarations are not contacted.
+- `ownerId`
+- `uploadedBy`
+- `openapiVersion`
+- `contentHash`
+- `operationCount`
+- `parseStatus`
+- `supportStatus`
+- `runnerProfile`
+- `document`
 
-### 6.4 Successful upload response
+External `$ref` resolution is disabled.
 
-`201 Created`
+The backend must not fetch external URLs, declared API server URLs, or arbitrary resources described in an uploaded specification.
+
+#### Upload Response Example
 
 ```json
 {
   "success": true,
   "data": {
-    "specification": {
-      "id": "SPEC_VERSION_OBJECT_ID",
-      "label": "1.0.0",
-      "openapiVersion": "3.2.1",
-      "title": "Demo Store API",
+    "specVersion": {
+      "id": "SPEC_VERSION_ID",
+      "projectId": "PROJECT_ID",
+      "label": "v1",
       "sourceFormat": "yaml",
-      "operationCount": 12,
+      "openapiVersion": "3.0.3",
+      "operationCount": 8,
       "parseStatus": "VALID",
-      "explorerCompleteness": "COMPLETE",
-      "warnings": [],
-      "explorerWarnings": [],
-      "createdAt": "2026-11-11T10:00:00.000Z"
+      "supportStatus": "COMPLETE",
+      "runnerProfile": "NONE"
     }
   }
 }
 ```
 
-This response illustrates the public structure. Actual operation counts and warning values depend on the uploaded specification.
+The values are illustrative. The server determines the actual parsing, support, and fixture-eligibility values.
 
-### 6.5 Duplicate specification upload
+### 3.5 API Explorer
 
-Uploading identical source content to the same project is rejected.
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| GET | `/specifications/:specVersionId/operations` | List extracted operations | Yes |
+| GET | `/specifications/:specVersionId/operations/:operationKey` | Retrieve one operation | Yes |
 
-Error code:
+Operation details may include:
 
-`DUPLICATE_RESOURCE`
-
-Duplicate version labels are also rejected.
-
-### 6.6 List specification versions
-
-`GET /projects/:projectId/specifications`
-
-Returns the specification versions associated with an owned project.
-
-The response includes:
-
-- Version identifier.
-- Label.
-- OpenAPI version.
-- Title.
-- Source format.
-- Operation count.
-- Parse status.
-- Explorer completeness.
-- Warnings.
-- Creation timestamp.
-
-### 6.7 Retrieve specification version
-
-`GET /specifications/:specVersionId`
-
-Returns a safe specification version detail object.
-
-The response may include the stored parsed document required by the API Explorer.
-
-The endpoint does not expose arbitrary filesystem paths or execute document content.
-
-## 7. API Explorer endpoints
-
-All API Explorer endpoints require authentication and specification-version access validation.
-
-### 7.1 Endpoint inventory
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/specifications/:specVersionId/operations` | List extracted operations |
-| GET | `/specifications/:specVersionId/operations/:operationKey` | Retrieve operation detail |
-| GET | `/specifications/:specVersionId/components/:componentType` | List reusable components |
-| GET | `/specifications/:specVersionId/components/:componentType/:componentName` | Retrieve reusable component |
-| GET | `/specifications/:specVersionId/references?ref=...` | Resolve an internal reference |
-
-### 7.2 List operations
-
-`GET /specifications/:specVersionId/operations`
-
-Returns the available extracted operations.
-
-A public operation representation includes:
-
-- Canonical operation key.
 - Original path.
 - HTTP method.
-- Operation summary.
-- Description where available.
-- Relevant support information.
-
-Canonical operation keys follow the format:
-
-`op_` followed by a SHA-256-derived base64url identifier.
-
-The frontend must use the returned operation key rather than generating one independently.
-
-### 7.3 Retrieve operation
-
-`GET /specifications/:specVersionId/operations/:operationKey`
-
-Returns the selected operation details.
-
-Supported information may include:
-
-- HTTP method.
-- Original path.
-- Operation metadata.
+- Operation summary and description.
 - Effective parameters.
-- Request body.
-- Response definitions.
-- Referenced schemas.
+- Request-body information.
+- Supported responses.
+- Supported schema details.
+- Internal reference information.
 - Source JSON Pointers.
-- Relevant support warnings.
+- Parser or support warnings.
 
-An invalid or inaccessible operation returns a safe resource error.
+The API Explorer is read-only.
 
-### 7.4 List components
+It does not execute requests against arbitrary API server URLs.
 
-`GET /specifications/:specVersionId/components/:componentType`
+### 3.6 Compatibility Reports
 
-Lists reusable components of an accepted OpenAPI component category.
+ContractGuard exposes compatibility reports through the `diff-reports` resource.
 
-Component types are validated against the application's supported OpenAPI component-type allowlist.
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| POST | `/projects/:projectId/diff-reports` | Create a baseline/candidate comparison | Yes |
+| GET | `/projects/:projectId/diff-reports` | List project comparison reports | Yes |
+| GET | `/projects/:projectId/diff-reports/:reportId` | Retrieve a comparison report and coverage projection | Yes |
 
-### 7.5 Retrieve a component
-
-`GET /specifications/:specVersionId/components/:componentType/:componentName`
-
-Returns one component after validating the component type and name.
-
-### 7.6 Resolve an internal reference
-
-`GET /specifications/:specVersionId/references?ref=%23%2Fcomponents%2Fschemas%2FProduct`
-
-The `ref` query parameter must:
-
-- Be present.
-- Be non-empty.
-- Begin with `#`.
-- Not exceed 2,000 characters.
-- Represent an allowed internal reference.
-
-External URLs and external relative-file references are not accepted.
-
-The response contains reference-resolution information supported by the specification explorer.
-
-## 8. Compatibility comparison endpoints
-
-### 8.1 Endpoint inventory
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/projects/:projectId/diff-reports` | Create a comparison report |
-| GET | `/projects/:projectId/diff-reports` | List comparison reports |
-| GET | `/projects/:projectId/diff-reports/:reportId` | Retrieve a comparison report |
-
-All comparison endpoints require authentication and project ownership validation.
-
-The project identifier is part of every comparison endpoint. The report must belong to that project.
-
-### 8.2 Create comparison
-
-`POST /projects/:projectId/diff-reports`
-
-Request:
+#### Create Report Request
 
 ```json
 {
-  "baselineVersionId": "BASELINE_SPEC_VERSION_OBJECT_ID",
-  "candidateVersionId": "CANDIDATE_SPEC_VERSION_OBJECT_ID"
+  "baselineVersionId": "BASELINE_SPEC_VERSION_ID",
+  "candidateVersionId": "CANDIDATE_SPEC_VERSION_ID"
 }
 ```
 
-For compatibility with earlier Phase 4 clients, the following legacy field names are also accepted:
+The backend verifies:
 
-```json
-{
-  "baselineSpecVersionId": "BASELINE_SPEC_VERSION_OBJECT_ID",
-  "candidateSpecVersionId": "CANDIDATE_SPEC_VERSION_OBJECT_ID"
-}
-```
+- Both specification versions exist.
+- Both versions belong to the same project.
+- The authenticated user owns the project.
+- The versions are distinct.
+- Both versions satisfy comparison validation requirements.
 
-New clients should use `baselineVersionId` and `candidateVersionId`.
+The backend determines:
 
-Validation requirements:
+- Comparison direction.
+- Compatibility ruleset version.
+- Analysis status.
+- Finding classifications.
+- Finding identifiers.
+- Affected operation keys.
+- Classification counts.
+- Warnings.
 
-- Both IDs must be valid MongoDB ObjectIds.
-- Baseline and candidate must be different.
-- Both versions must belong to the same project.
-- The project must belong to the authenticated user.
-- Both specification documents must be available and valid.
+The client cannot override these values.
 
-The backend controls the comparison direction and ruleset version.
-
-Comparison direction:
+#### Comparison Direction
 
 `BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER`
 
-Ruleset:
+The baseline represents the contract existing consumers may rely upon.
+
+The candidate represents the newer provider contract being evaluated.
+
+#### Ruleset
 
 `CG-COMPAT-1.1`
 
-### 8.3 Comparison creation response
+The ruleset identifier is persisted with the report.
 
-A newly generated report returns:
+#### Report Contents
 
-`201 Created`
+A report may contain:
 
-A reused existing comparison report returns:
-
-`200 OK`
-
-Illustrative response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "diffReport": {
-      "id": "DIFF_REPORT_OBJECT_ID",
-      "projectId": "PROJECT_OBJECT_ID",
-      "baselineVersionId": "BASELINE_VERSION_OBJECT_ID",
-      "candidateVersionId": "CANDIDATE_VERSION_OBJECT_ID",
-      "direction": "BASELINE_CONSUMER_TO_CANDIDATE_PROVIDER",
-      "rulesetVersion": "CG-COMPAT-1.1",
-      "analysisStatus": "COMPLETE",
-      "summary": {
-        "breaking": 1,
-        "potentiallyBreaking": 0,
-        "nonBreaking": 2,
-        "informational": 1,
-        "unsupported": 0
-      },
-      "changes": [],
-      "warnings": [],
-      "createdAt": "2026-11-11T10:30:00.000Z"
-    },
-    "reused": false
-  }
-}
-```
-
-All values are illustrative.
-
-### 8.4 Comparison deduplication
-
-The backend uses a SHA-256-based analysis fingerprint derived from:
-
-- Project ID.
-- Baseline content hash.
-- Candidate content hash.
-- Analyzer version.
-- Ruleset version.
-
-If an existing report with the same fingerprint is found, it can be reused instead of producing a duplicate report.
-
-### 8.5 List comparisons
-
-`GET /projects/:projectId/diff-reports`
-
-Optional query parameter:
-
-`limit`
-
-Default:
-
-`20`
-
-Maximum:
-
-`50`
-
-Example:
-
-`GET /projects/PROJECT_ID/diff-reports?limit=20`
-
-The response contains:
-
-- Report ID.
-- Baseline version reference.
-- Candidate version reference.
-- Version labels.
+- Baseline and candidate references.
 - Comparison direction.
 - Ruleset version.
 - Analysis status.
 - Classification summary.
-- Creation timestamp.
+- Individual findings.
+- Affected operation keys.
+- Source JSON Pointers.
+- Finding rationales.
+- Partial-analysis warnings.
+- Test-coverage projections.
 
-### 8.6 Retrieve comparison report
-
-`GET /projects/:projectId/diff-reports/:reportId`
-
-Returns the requested report after validating project ownership.
-
-In the Phase 6 integration, report retrieval also derives the current test-coverage projection using the baseline test-case library.
-
-The stored comparison findings are not rewritten to store mutable test-coverage data.
-
-### 8.7 Report classifications
-
-Each change can contain:
-
-- `changeId`
-- `ruleId`
-- `classification`
-- `operationKey`
-- `affectedOperationKeys`
-- `jsonPointer`
-- `summary`
-- `rationale`
-
-Classification values:
+#### Finding Classifications
 
 - `BREAKING`
 - `POTENTIALLY_BREAKING`
@@ -876,79 +405,42 @@ Classification values:
 - `INFORMATIONAL`
 - `UNSUPPORTED`
 
-Analysis status values:
+#### Analysis Status
 
 - `COMPLETE`
 - `PARTIAL`
 - `FAILED`
 
-Unsupported relevant constructs must not be silently considered compatible.
+A complete specification comparison does not prove that a deployed API implementation is runtime-compatible.
 
-## 9. Phase 6 — Test-case endpoints
+### 3.7 Test Cases
 
-These routes form the Phase 6 test-case management API.
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| GET | `/specifications/:specVersionId/test-cases` | List test cases for a baseline version | Yes |
+| POST | `/specifications/:specVersionId/test-cases` | Create a manual draft test case | Yes |
+| GET | `/test-cases/:testCaseId` | Retrieve a test case | Yes |
+| PATCH | `/test-cases/:testCaseId` | Edit an eligible draft test case | Yes |
+| POST | `/test-cases/:testCaseId/approve` | Approve a reviewed test case | Yes |
+| POST | `/test-cases/:testCaseId/archive` | Archive a test case | Yes |
 
-All routes require authentication and validate access to the associated project/specification version.
+A test case belongs to exactly one specification version.
 
-### 9.1 Endpoint inventory
+For a comparison run, that version must match the comparison's baseline specification version.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/specifications/:specVersionId/test-cases` | List cases for a specification version |
-| POST | `/specifications/:specVersionId/test-cases` | Create a manual draft test case |
-| GET | `/test-cases/:testCaseId` | Retrieve a test case |
-| PATCH | `/test-cases/:testCaseId` | Update a draft test case |
-| POST | `/test-cases/:testCaseId/approve` | Approve a draft |
-| POST | `/test-cases/:testCaseId/archive` | Archive a case |
-
-### 9.2 List test cases
-
-`GET /specifications/:specVersionId/test-cases`
-
-Returns test cases associated with the requested specification version.
-
-The response includes:
-
-- Test-case identifier.
-- Project ID.
-- Specification version ID.
-- Operation key.
-- Operation path.
-- Title and description.
-- Source.
-- Lifecycle status.
-- Request inputs.
-- Assertions.
-- Creation and modification timestamps.
-- Approval timestamp where applicable.
-
-The current service returns up to 500 records per specification version.
-
-Archived cases may be returned in the library but are excluded from live coverage calculations.
-
-### 9.3 Create manual test case
-
-`POST /specifications/:specVersionId/test-cases`
-
-Creates a new test case in `DRAFT` status.
-
-V1 manual test-case support is deliberately restricted to GET path operations.
-
-Request:
+#### Create Test Case Request
 
 ```json
 {
-  "operationKey": "op_REPLACE_WITH_VALID_OPERATION_KEY",
+  "operationKey": "CANONICAL_OPERATION_KEY",
   "operationPath": "/products/{productId}",
   "title": "Retrieve an existing product",
-  "description": "Verify retrieval of an existing product.",
+  "description": "Verify that an existing consumer can retrieve a product.",
   "request": {
     "pathParams": {
       "productId": "1001"
     },
-    "queryParams": {
-      "includeReviews": "false"
-    }
+    "queryParams": {}
   },
   "assertions": {
     "expectedStatus": 200,
@@ -962,420 +454,273 @@ Request:
 }
 ```
 
-`operationKey` must be the exact canonical key returned by the baseline specification's API Explorer. The illustrative placeholder is not a valid operation key.
+The request must conform to the baseline operation.
 
-The backend independently verifies:
+The backend validates:
 
-- Specification-version ownership.
-- Project ownership.
-- Operation existence.
-- GET method.
-- Path equality.
-- Declared path parameter names.
+- Operation-key and path association.
+- Required path parameter values.
 - Declared query parameter names.
-- All required path values.
-- All required query values.
-- Input count and value-length limits.
-- Assertion structure.
+- Input length and count limits.
+- Assertion structure and supported assertion types.
 
-Only `pathParams` and `queryParams` are permitted in the request object.
+Arbitrary target URLs, hostnames, headers, credentials, executable code, and shell commands are not accepted.
 
-The following are rejected:
+#### Test Case Lifecycle
 
-- Arbitrary URL fields.
-- Arbitrary hostnames.
-- Custom execution targets.
-- Custom request headers.
-- Arbitrary credentials.
-- Request-body execution fields.
-- Unknown request properties.
+- `DRAFT`
+- `APPROVED`
+- `ARCHIVED`
 
-Successful response:
+AI-generated test cases are initially saved as drafts.
 
-`201 Created`
+Only approved and otherwise eligible test cases may be executed.
 
-```json
-{
-  "success": true,
-  "data": {
-    "testCase": {
-      "id": "TEST_CASE_OBJECT_ID",
-      "projectId": "PROJECT_OBJECT_ID",
-      "specVersionId": "SPEC_VERSION_OBJECT_ID",
-      "operationKey": "op_REPLACE_WITH_VALID_OPERATION_KEY",
-      "operationPath": "/products/{productId}",
-      "title": "Retrieve an existing product",
-      "description": "Verify retrieval of an existing product.",
-      "source": "MANUAL",
-      "status": "DRAFT",
-      "request": {
-        "pathParams": {
-          "productId": "1001"
-        },
-        "queryParams": {
-          "includeReviews": "false"
-        }
-      },
-      "assertions": {
-        "expectedStatus": 200,
-        "propertyAssertions": [],
-        "requiredProperties": [
-          "id",
-          "name",
-          "price"
-        ]
-      },
-      "approvedAt": null
-    }
-  }
-}
-```
+Approved test cases must not be silently modified through ordinary draft-editing operations.
 
-### 9.4 Retrieve test case
+### 3.8 AI-Assisted Test Suggestions
 
-`GET /test-cases/:testCaseId`
+AI suggestions are scoped to a selected compatibility report and a supported synthetic Demo Store operation.
 
-Returns a test case after verifying that its associated specification version belongs to the authenticated user's project.
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| GET | `/projects/:projectId/diff-reports/:reportId/ai-test-suggestions/preview` | Retrieve the selected operation and provider-submission preview | Yes |
+| POST | `/projects/:projectId/diff-reports/:reportId/ai-test-suggestions` | Generate and persist validated draft suggestions | Yes |
 
-Inaccessible or nonexistent records return:
+#### Supported Operations
 
-`404 Not Found`
+| Operation ID | Method | Path |
+|---|---|---|
+| `listProducts` | GET | `/products` |
+| `getProduct` | GET | `/products/{productId}` |
 
-### 9.5 Update draft test case
+#### Preview Request
 
-`PATCH /test-cases/:testCaseId`
-
-Only `DRAFT` cases can be edited.
-
-Supported fields:
-
-- `title`
-- `description`
-- `request`
-- `assertions`
+The preview endpoint uses the `operationId` query parameter.
 
 Example:
 
-```json
-{
-  "title": "Retrieve an existing product successfully",
-  "description": "Updated verification description."
-}
+```http
+GET /api/v1/projects/PROJECT_ID/diff-reports/REPORT_ID/ai-test-suggestions/preview?operationId=listProducts
 ```
 
-The backend rejects:
+The preview operation does not contact Gemini.
 
-- Empty update bodies.
-- Unknown fields.
-- Attempts to modify immutable operation references.
-- Attempts to modify specification-version ownership.
-- Attempts to change the test-case source.
-- Attempts to directly set lifecycle status.
-- Attempts to edit approved or archived cases.
+It returns the selected operation and the sanitized provider-submission preview, allowing the user to inspect the information before submission.
 
-Successful response:
-
-`200 OK`
-
-Attempting to edit a case that is no longer a draft returns:
-
-`409 Conflict`
-
-Error code:
-
-`TEST_CASE_STATE_CONFLICT`
-
-### 9.6 Approve test case
-
-`POST /test-cases/:testCaseId/approve`
-
-Approves an eligible draft after validating its baseline operation and request inputs again.
-
-Lifecycle transition:
-
-`DRAFT → APPROVED`
-
-The server sets `approvedAt`.
-
-The client cannot directly approve a test case through a PATCH status field.
-
-Trying to approve an already approved or archived case returns a state conflict.
-
-### 9.7 Archive test case
-
-`POST /test-cases/:testCaseId/archive`
-
-Allowed transitions:
-
-- `DRAFT → ARCHIVED`
-- `APPROVED → ARCHIVED`
-
-Archived cases become read-only and do not contribute to live comparison coverage.
-
-Archiving preserves the test-case record for historical reference.
-
-Repeated archive requests return the existing archived representation.
-
-## 10. Change-to-test coverage API projection
-
-Coverage is part of comparison retrieval.
-
-It is not a separately persisted mutable copy of test-case information.
-
-### 10.1 Affected operations
-
-Each supported comparison finding contains its affected baseline operation keys.
-
-These keys are generated by the comparison and reference-impact logic.
-
-The traceability service matches these keys against test cases associated with the exact baseline specification version.
-
-### 10.2 Coverage calculation
-
-The calculation operates independently for every affected baseline operation.
-
-| Condition | Result |
-|---|---|
-| Every affected operation has at least one approved case | `COVERED` |
-| Every affected operation has a case, but at least one has drafts only | `DRAFT_ONLY` |
-| At least one affected operation has no active linked case | `UNCOVERED` |
-| No affected operation key exists | `UNMAPPED` |
-
-Archived cases are ignored.
-
-One approved test case for one operation cannot cover a change affecting multiple operations if another affected operation has no approved case.
-
-### 10.3 Per-change coverage projection
-
-The comparison response may include:
+#### Generation Request
 
 ```json
 {
-  "testCoverage": {
-    "affectedOperationCount": 2,
-    "coveredOperationCount": 1,
-    "draftOnlyOperationCount": 0,
-    "uncoveredOperationCount": 1,
-    "totalLinkedTestCases": 2,
-    "approvedCount": 1,
-    "draftCount": 1,
-    "coverageStatus": "UNCOVERED",
-    "linkedTestCases": []
-  }
+  "operationId": "listProducts",
+  "consent": true
 }
 ```
 
-The example illustrates an incomplete state; actual linked case details are supplied by the service.
+The backend must enforce:
 
-### 10.4 Coverage summary
+1. The project and report belong to the authenticated user.
+2. The report references valid baseline and candidate versions.
+3. The selected operation is supported.
+4. The operation context is built from the trusted synthetic fixture.
+5. Explicit consent is present.
+6. The provider key remains server-side.
+7. Model output conforms to the expected structured format.
+8. Generated suggestions match the selected operation.
+9. Valid suggestions are persisted as draft test cases.
 
-The report-level coverage summary may contain:
+The client cannot submit arbitrary prompt text or choose an execution target.
+
+AI-generated content is data, not executable code.
+
+#### AI Submission Restrictions
+
+- Only the selected trusted synthetic operation context is submitted.
+- Arbitrary uploaded production specifications are not submitted.
+- Credentials and API keys are excluded.
+- Consent is required before provider submission.
+- AI output is validated before persistence.
+- Suggestions remain drafts until reviewed and approved.
+- Provider failure does not affect compatibility analysis or regression execution.
+
+The AI endpoint is rate-limited per authenticated user.
+
+### 3.9 Regression Test Runs
+
+Every test run is associated with a specific compatibility report.
+
+| Method | Path | Purpose | Authentication |
+|---|---|---|---|
+| POST | `/projects/:projectId/diff-reports/:reportId/test-runs` | Start a regression run for a report | Yes |
+| GET | `/projects/:projectId/diff-reports/:reportId/test-runs` | List runs for a report | Yes |
+| GET | `/projects/:projectId/diff-reports/:reportId/test-runs/:testRunId` | Retrieve a run and its results | Yes |
+
+#### Run Creation Request
 
 ```json
 {
-  "totalChanges": 8,
-  "affectedChanges": 6,
-  "coveredChanges": 2,
-  "draftOnlyChanges": 1,
-  "uncoveredChanges": 3,
-  "unmappedChanges": 2
+  "testCaseIds": [
+    "TEST_CASE_ID_1",
+    "TEST_CASE_ID_2"
+  ]
 }
 ```
 
-These values are illustrative.
+The server verifies:
 
-### 10.5 Important distinction
+- The report belongs to the project in the route.
+- The project is owned by the authenticated user.
+- The baseline and candidate versions match the report.
+- The candidate has a recognized bundled execution profile.
+- Every selected test case belongs to the report's baseline version.
+- Every selected test case is approved.
+- Every selected operation is supported by the bundled implementation.
+- The selected count is within the configured limit.
+- Execution concurrency and time limits are respected.
 
-Coverage represents the availability of suitable test cases.
+A successful run-creation request returns `202 Accepted`.
 
-It does not represent:
+#### Execution Restrictions
 
-- Successful test execution.
-- Candidate response validation.
-- Runtime compatibility.
-- Production API health.
+The client cannot choose:
 
-Those outcomes require a separate regression-run implementation.
+- Target URL.
+- Hostname or IP address.
+- Port.
+- Network destination.
+- Fixture identifier.
+- Candidate implementation version.
+- Final run status.
+- Final test results.
 
-## 11. Validation and input constraints
+The server selects the candidate implementation through the trusted fixture registry and executes supported GET operations.
 
-All incoming API requests must be validated on the backend.
+Candidate responses are validated against the baseline response contract.
 
-Zod provides request-shape validation, while Mongoose provides an additional persistence-level safeguard.
+The runner does not use uploaded OpenAPI `servers` entries as execution targets.
 
-### 11.1 General validation
+#### Run Statuses
 
-- Validate ObjectIds before database access.
+- `QUEUED`
+- `RUNNING`
+- `PASSED`
+- `FAILED`
+- `PARTIAL`
+- `INTERRUPTED`
+
+Individual results:
+
+- `PASSED`
+- `FAILED`
+- `SKIPPED`
+- `UNSUPPORTED`
+- `ERROR`
+
+The run result must distinguish a contract-validation failure from an unsupported operation or execution error.
+
+## 4. Pagination and Query Conventions
+
+Collection endpoints use bounded pagination where supported.
+
+Common query parameters include:
+
+- `page`: one-based page number.
+- `limit`: maximum number of returned records.
+- `sort`: endpoint-specific allowlisted sort field.
+- `order`: `asc` or `desc`.
+
+The backend enforces maximum values and validates sort fields.
+
+Unknown query parameters must be rejected or deliberately stripped according to the endpoint validator.
+
+Arbitrary client values must never be passed directly into MongoDB filters, sort expressions, or projections.
+
+## 5. Validation Requirements
+
+Request bodies, path parameters, query strings, and multipart metadata are validated by backend validators.
+
+Requirements:
+
+- Validate MongoDB ObjectIds before database access.
+- Validate project ownership before child-resource operations.
 - Reject unknown security-sensitive fields.
-- Apply explicit string length restrictions.
-- Limit array sizes.
-- Validate enums.
-- Validate operation references.
-- Verify resource ownership.
-- Avoid mass assignment through direct client-object updates.
+- Apply explicit string, array, and payload limits.
+- Validate test-case approval status before execution.
+- Verify that selected tests belong to the report's baseline version.
+- Validate upload size and source format.
+- Calculate specification hashes on the server.
+- Assign runner profiles through the trusted fixture registry.
+- Keep provider configuration server-side.
+- Validate AI output before creating draft test cases.
+- Never trust client-supplied report status, test outcome, ruleset, or target.
 
-### 11.2 Upload validation
+## 6. Error Code Catalogue
 
-| Constraint | Limit |
-|---|---:|
-| File size | 1 MiB |
-| File count | 1 |
-| Accepted extensions | `.json`, `.yaml`, `.yml` |
-| Encoding | UTF-8 |
-| Version label | Maximum 80 characters |
+| Code | Meaning |
+|---|---|
+| `VALIDATION_ERROR` | Request does not match the input schema |
+| `AUTH_REQUIRED` | Authentication is missing or invalid |
+| `CSRF_ORIGIN_REJECTED` | Request failed origin validation |
+| `RESOURCE_NOT_FOUND` | Resource does not exist or is not owned |
+| `DUPLICATE_RESOURCE` | Duplicate project-scoped content or label |
+| `PROJECT_DELETED` | Project is no longer active |
+| `SPEC_INVALID` | OpenAPI document is structurally invalid |
+| `SPEC_VERSION_UNSUPPORTED` | OpenAPI version is unsupported |
+| `SPEC_LIMIT_EXCEEDED` | Document or parser resource limit exceeded |
+| `SPEC_REFERENCE_UNSUPPORTED` | Reference is outside supported resolution boundaries |
+| `ANALYSIS_PARTIAL` | Unsupported constructs prevent complete analysis |
+| `COMPARISON_FAILED` | Compatibility analysis could not be completed |
+| `COMPARISON_VERSION_MISMATCH` | Versions do not belong to the same project |
+| `TEST_CASE_STATE_CONFLICT` | Requested lifecycle transition is not allowed |
+| `TEST_CASE_LIMIT_EXCEEDED` | Specification test-case limit exceeded |
+| `TEST_CASE_NOT_APPROVED` | Selected test case is not approved |
+| `TEST_CASE_BASELINE_MISMATCH` | Test case does not belong to the report baseline |
+| `TEST_RUN_LIMIT_EXCEEDED` | Test count, concurrency, or time limit exceeded |
+| `COMPARISON_NOT_RUNNABLE` | Candidate has no eligible bundled execution profile |
+| `UNSUPPORTED_OPERATION` | Operation is not supported by the bundled runner |
+| `AI_NOT_CONFIGURED` | Gemini integration is not configured |
+| `AI_CONSENT_REQUIRED` | Explicit provider-submission consent is missing |
+| `AI_OPERATION_NOT_FOUND` | Selected operation is not in the supported synthetic operation registry |
+| `AI_INVALID_MODEL_OUTPUT` | Provider response does not match the required suggestion structure |
+| `RATE_LIMITED` | Endpoint rate limit exceeded |
 
-The backend derives the source format from the validated filename extension and processes the actual uploaded file contents.
+Actual error codes are determined by the backend error mapping. This catalogue should be updated whenever a public error contract changes.
 
-### 11.3 Test-case validation
+## 7. API Security Requirements
 
-| Constraint | Limit |
-|---|---:|
-| Test cases per specification version | 500 |
-| Path and query entries combined | 20 |
-| Parameter value length | 256 characters |
-| Title length | 120 characters |
-| Description length | 1,000 characters |
-| Property assertions | 20 |
-| Required-property assertions | 20 |
+- All protected endpoints require authentication.
+- All resource operations enforce project ownership.
+- Cookie-authenticated state-changing requests use origin protection.
+- Uploaded documents are bounded and validated on the backend.
+- External references and arbitrary server URLs are never fetched.
+- Comparison direction and ruleset are selected by the backend.
+- Test cases are linked to baseline versions.
+- Test runs require a valid report.
+- Only approved eligible cases can execute.
+- The runner uses server-controlled bundled implementations.
+- AI submissions require explicit consent.
+- AI output is validated before persistence.
+- Secrets, stack traces, and sensitive paths are not returned.
 
-Additional restrictions:
-
-- GET path operations only.
-- Required path and query parameters must be provided.
-- Parameter names must exist in the baseline operation.
-- Property assertion paths are restricted to safe dot-separated property names.
-- Assertion payloads must remain bounded JSON values.
-- Arbitrary URLs and executable inputs are rejected.
-
-## 12. Error-code catalogue
-
-| Error code | HTTP status | Meaning |
-|---|---:|---|
-| `VALIDATION_ERROR` | 400 | Request validation failed |
-| `INVALID_JSON` | 400 | Request body contains malformed JSON |
-| `AUTH_REQUIRED` | 401 | Authentication is missing or invalid |
-| `ORIGIN_NOT_ALLOWED` | 403 | Request origin validation failed |
-| `RESOURCE_NOT_FOUND` | 404 | Resource missing or not accessible |
-| `DUPLICATE_RESOURCE` | 409 | Duplicate project-scoped resource |
-| `TEST_CASE_STATE_CONFLICT` | 409 | Invalid test-case lifecycle operation |
-| `PAYLOAD_TOO_LARGE` | 413 | JSON request body exceeds the configured limit |
-| `SPEC_LIMIT_EXCEEDED` | 413 | Specification upload exceeds its limit |
-| `UNSUPPORTED_MEDIA_TYPE` | 415 | Unsupported uploaded file format |
-| `DIFF_REPORT_TOO_LARGE` | 413 | Comparison report exceeds its storage limit |
-| `SERVICE_UNAVAILABLE` | 503 | Required service unavailable |
-| `INTERNAL_SERVER_ERROR` | 500 | Unexpected server error |
-
-Additional application-level error codes may be introduced when implementing subsequent features.
-
-Error codes must remain consistent with the actual `AppError`, validation middleware, and centralized error handler.
-
-## 13. Rate limiting
-
-The authentication layer applies separate rate-limit policies to:
-
-- Account registration.
-- Login attempts.
-
-Sensitive endpoints must remain protected against brute-force attempts and abusive requests.
-
-Additional limits should be introduced where justified by actual resource consumption.
-
-Do not depend on frontend-only rate limiting.
-
-## 14. API implementation boundaries
-
-### 14.1 Implemented baseline API
-
-The Phase 5 backend provides:
-
-- Health.
-- Authentication.
-- Projects.
-- Specification upload and retrieval.
-- Specification operation exploration.
-- Reusable component browsing.
-- Internal reference resolution.
-- Compatibility comparison creation.
-- Comparison history and retrieval.
-
-### 14.2 Phase 6 test-case API
-
-The Phase 6 source implementation adds:
-
-- Baseline-version test-case listing.
-- Manual test-case creation.
-- Test-case retrieval.
-- Draft editing.
-- Approval.
-- Archiving.
-- Live comparison coverage projection.
-
-These additions require the dedicated integration suite and local runtime validation before they can be treated as fully accepted.
-
-### 14.3 Future API capabilities
-
-The following are outside the current implemented API:
-
-- General-purpose external API execution.
-- Regression-run creation and execution.
-- Test-run result retrieval.
-- User-controlled runner target configuration.
-- AI-assisted test generation.
-- AI provider management.
-- CI gating and GitHub integration.
-- Team and organization management.
-
-No endpoint should be documented as implemented until the corresponding route, validator, controller, service, and integration tests exist.
-
-## 15. API compatibility and versioning policy
-
-The current application API uses:
-
-`/api/v1`
-
-Changes to existing request or response structures must be deliberate.
-
-Guidelines:
-
-- Preserve existing response envelope conventions.
-- Avoid changing established resource identifiers.
-- Maintain backward-compatible field aliases only when a migration requires them.
-- Document deprecated request names.
-- Validate unknown fields to prevent accidental mass assignment.
-- Introduce a new API major version only when backward-incompatible changes justify it.
-
-The uploaded OpenAPI document's version is independent of the ContractGuard application API version.
-
-## 16. API acceptance criteria
+## 8. API Acceptance Criteria
 
 The API contract is accepted when:
 
-1. Protected endpoints require valid authentication.
-2. Project and child-resource ownership checks are enforced.
-3. Request-origin validation protects state-changing requests.
-4. Specification uploads are bounded and validated.
-5. External references and uploaded server URLs are never fetched.
-6. Specification versions preserve their original content and hashes.
-7. API Explorer routes return supported operation and component details.
-8. Comparisons record their server-defined direction and ruleset.
-9. Comparison findings expose stable change IDs and rule information.
-10. Shared-schema findings retain supported affected-operation keys.
-11. Test cases belong to an exact baseline specification version.
-12. Test-case lifecycle transitions are enforced server-side.
-13. Approved cases cannot be silently edited.
-14. Coverage is derived from current baseline test cases.
-15. A change is covered only when every affected operation has an approved linked case.
-16. Archived cases do not count toward coverage.
-17. Historical comparison findings are not rewritten by live coverage calculations.
-18. Errors remain structured and do not leak sensitive implementation details.
-19. All implemented endpoint workflows have backend integration-test coverage.
-
-## 17. Official technical references
-
-- Express documentation: https://expressjs.com/
-- Mongoose documentation: https://mongoosejs.com/docs/
-- Zod documentation: https://zod.dev/
-- OpenAPI Specification: https://spec.openapis.org/oas/v3.2.1.html
-- OWASP Authentication Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
-- OWASP CSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
-- OWASP SSRF Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+1. Authentication and project ownership are enforced on protected routes.
+2. Request validation is applied to bodies, parameters, and queries.
+3. Upload size and parsing limits are enforced.
+4. Specification versions preserve original source content.
+5. Comparison creation enforces project and version consistency.
+6. Comparison reports retain their direction and ruleset.
+7. Report retrieval includes the current test-coverage projection.
+8. Test cases are associated with baseline specification versions.
+9. Draft, approved, and archived transitions are enforced server-side.
+10. Test runs reference a comparison and eligible baseline cases.
+11. Candidate responses are checked against baseline response schemas.
+12. Arbitrary network execution is not exposed.
+13. AI preview does not call the provider.
+14. AI generation requires explicit consent.
+15. Valid AI suggestions are persisted as drafts.
+16. Provider unavailability does not disable deterministic functionality.
+17. Error responses do not leak credentials or internal implementation details.
+18. Endpoint behavior is covered by automated tests.
